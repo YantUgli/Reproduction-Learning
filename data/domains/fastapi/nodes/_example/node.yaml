@@ -1,0 +1,11 @@
+# Node CONTOH (bukan kurikulum) — prefix `_` menandai ia hanya untuk menguji
+# harness M1 end-to-end. Bukan node FastAPI sungguhan; itu diisi di M2.
+id: _example
+domain_id: fastapi
+concept: "contoh harness: fungsi add(a, b)"
+description: "Node trivial untuk membuktikan harness jalan sebelum node sungguhan."
+grader_type: unit_test
+source_refs: []
+estimated_minutes: 1
+timebox_seconds: 30
+status_default: available

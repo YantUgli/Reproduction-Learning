@@ -62,7 +62,7 @@ M0  Scaffolding & Data Model ─┬─▶ M1  Execution Harness ─┬─▶ M2 
 | ID | Milestone | Peta PRD | Dependency | Est. | Status |
 |----|-----------|----------|------------|------|--------|
 | [M0](milestones/M0-scaffolding-and-data-model.md) | Scaffolding & Data Model | prasyarat | — | 1–2 hari | ✅ selesai |
-| [M1](milestones/M1-execution-harness.md) | Execution Harness (subprocess) | Tahap 0b | M0 | 0,5–1 hari |
+| [M1](milestones/M1-execution-harness.md) | Execution Harness (subprocess) | Tahap 0b | M0 | 0,5–1 hari | ✅ selesai |
 | [M2](milestones/M2-authoring-and-first-nodes.md) | Authoring Kit + 5 Node FastAPI | Track A1 | M1 | 4–5 hari |
 | [M3](milestones/M3-vertical-slice-core-loop.md) | Vertical Slice / Core Loop | Fase 1 | M1, M2 | 2–3 minggu |
 | [M4](milestones/M4-full-loop-fsrs-dashboard.md) | Full Loop: FSRS + Placement + Dashboard | Fase 2 | M3 + Gerbang 0 | 2–3 minggu |
