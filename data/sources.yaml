@@ -1,0 +1,17 @@
+# SourceRef awal (sumber otoritatif untuk edge prerequisite — PRD §9).
+# type ∈ {cs2023_ku, textbook_toc, official_docs}
+sources:
+  - id: cs2023_ku
+    type: cs2023_ku
+    citation: "ACM/IEEE CS2023 — Knowledge Units (Software Engineering / Programming)"
+    url_or_locator: "https://csed.acm.org/"
+
+  - id: fastapi_book_toc
+    type: textbook_toc
+    citation: "Building Data Science Applications with FastAPI — Table of Contents"
+    url_or_locator: "textbook:building-data-science-applications-with-fastapi/toc"
+
+  - id: fastapi_official_docs
+    type: official_docs
+    citation: "FastAPI — Official Documentation"
+    url_or_locator: "https://fastapi.tiangolo.com/"

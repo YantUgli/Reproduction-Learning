@@ -1,0 +1,3 @@
+# Daftar edge prerequisite (hard/soft). Kosong di M0; diisi M2 oleh Isyah.
+# Skema tiap item: {from, to, type, source_ref, note}
+edges: []
