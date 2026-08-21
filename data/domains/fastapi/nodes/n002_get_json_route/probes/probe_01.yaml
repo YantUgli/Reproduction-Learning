@@ -1,0 +1,6 @@
+id: n002_probe_01
+node_id: n002_get_json_route
+type: predict_output
+question: "GET ke route yang mengembalikan dict tanpa error, status code-nya?"
+options: ["200", "201", "204", "404"]
+correct_answer: "200"

@@ -1,0 +1,6 @@
+id: n004_probe_01
+node_id: n004_query_param_default
+type: predict_output
+question: "limit dideklarasikan `int`. Request GET /search?limit=abc menghasilkan status?"
+options: ["200", "400", "404", "422"]
+correct_answer: "422"

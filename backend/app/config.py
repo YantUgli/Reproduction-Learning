@@ -12,7 +12,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 
 # Database SQLite single-user, local-first.
-DATABASE_URL = "sqlite:///./app.db"
+# Path ABSOLUT (anchored di backend/app.db) supaya stabil apa pun cwd: uvicorn
+# (dari backend/) & scripts/*.py (dari repo root) menunjuk DB yang sama.
+# (Deviasi dari default M0 `sqlite:///./app.db` — dicatat di CLAUDE.md §7.)
+DB_PATH = REPO_ROOT / "backend" / "app.db"
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # Ambang mastery default: N sukses berjarak sebelum sebuah node dianggap dikuasai.
 # (PRD §2 / CLAUDE.md — verifikasi via eksekusi, bukan AI.)

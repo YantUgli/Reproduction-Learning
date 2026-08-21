@@ -1,3 +1,37 @@
-# Daftar edge prerequisite (hard/soft). Kosong di M0; diisi M2 oleh Isyah.
-# Skema tiap item: {from, to, type, source_ref, note}
-edges: []
+# Edge prerequisite antar node A1 (n001..n005).
+#
+# INVARIANT (PRD §1/§4): edge berasal dari sumber otoritatif + KEPUTUSAN ISYAH.
+# Daftar di bawah adalah KANDIDAT yang di-draft dari struktur tutorial FastAPI;
+# `type` (hard/soft) di sini adalah usulan — Isyah WAJIB me-review & memfinalkan.
+# Hanya `type: hard` yang mengikat urutan; node independen bebas diambil.
+# Bryant tidak pernah menyentuh file ini (validitas — §1 PRD).
+#
+# Arah: from = prasyarat, to = yang bergantung.
+edges:
+  # n001 (fungsi murni + pytest) melatih pipeline grade; membantu tapi tak wajib.
+  - from: n001_paginate
+    to: n002_get_json_route
+    type: soft
+    source_ref_id: fastapi_docs_first_steps
+    note: "Fluensi fungsi Python + pytest memudahkan route pertama; bukan prasyarat keras."
+
+  # Route GET dasar adalah fondasi keras untuk path param + 404.
+  - from: n002_get_json_route
+    to: n003_path_param_404
+    type: hard
+    source_ref_id: fastapi_docs_path_params
+    note: "Path param dibangun di atas route GET dasar."
+
+  # Route GET dasar adalah fondasi keras untuk query param.
+  - from: n002_get_json_route
+    to: n004_query_param_default
+    type: hard
+    source_ref_id: fastapi_docs_query_params
+    note: "Query param memerlukan pemahaman route GET dasar."
+
+  # Route dasar adalah fondasi keras untuk POST body pydantic.
+  - from: n002_get_json_route
+    to: n005_post_pydantic_body
+    type: hard
+    source_ref_id: fastapi_docs_body
+    note: "POST body dibangun di atas mekanika route dasar."

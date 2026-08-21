@@ -1,0 +1,13 @@
+id: n002_get_json_route
+domain_id: fastapi
+concept: "GET route sederhana mengembalikan dict JSON dengan status 200"
+description: >
+  Route GET paling dasar di FastAPI: definisikan path, kembalikan dict,
+  pastikan status 200 dan body persis.
+grader_type: unit_test
+estimated_minutes: 12
+timebox_seconds: 900
+status_default: locked
+source_refs: [fastapi_docs_first_steps]
+signature_contract: "@app.get('<path>') -> dict (status 200)"
+scaffold_level: L2

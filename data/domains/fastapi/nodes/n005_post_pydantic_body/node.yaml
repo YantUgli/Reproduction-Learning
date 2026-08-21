@@ -1,0 +1,13 @@
+id: n005_post_pydantic_body
+domain_id: fastapi
+concept: "POST dengan body pydantic; status 201; 422 jika body tak valid"
+description: >
+  Definisikan model pydantic, terima sebagai request body pada POST,
+  kembalikan echo tervalidasi dengan status 201. Body tak valid -> 422.
+grader_type: unit_test
+estimated_minutes: 18
+timebox_seconds: 1200
+status_default: locked
+source_refs: [fastapi_docs_body]
+signature_contract: "class M(BaseModel); @app.post('<path>', status_code=201) def f(m: M)"
+scaffold_level: L2

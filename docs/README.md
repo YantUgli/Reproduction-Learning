@@ -63,7 +63,7 @@ M0  Scaffolding & Data Model ─┬─▶ M1  Execution Harness ─┬─▶ M2 
 |----|-----------|----------|------------|------|--------|
 | [M0](milestones/M0-scaffolding-and-data-model.md) | Scaffolding & Data Model | prasyarat | — | 1–2 hari | ✅ selesai |
 | [M1](milestones/M1-execution-harness.md) | Execution Harness (subprocess) | Tahap 0b | M0 | 0,5–1 hari | ✅ selesai |
-| [M2](milestones/M2-authoring-and-first-nodes.md) | Authoring Kit + 5 Node FastAPI | Track A1 | M1 | 4–5 hari |
+| [M2](milestones/M2-authoring-and-first-nodes.md) | Authoring Kit + 5 Node FastAPI | Track A1 | M1 | 4–5 hari | ✅ selesai |
 | [M3](milestones/M3-vertical-slice-core-loop.md) | Vertical Slice / Core Loop | Fase 1 | M1, M2 | 2–3 minggu |
 | [M4](milestones/M4-full-loop-fsrs-dashboard.md) | Full Loop: FSRS + Placement + Dashboard | Fase 2 | M3 + Gerbang 0 | 2–3 minggu |
 | [M5](milestones/M5-claude-code-integration.md) | Claude Code Integration | Fase 3 | M4 | 3–4 minggu |

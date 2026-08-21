@@ -1,0 +1,13 @@
+id: n001_paginate
+domain_id: fastapi
+concept: "Pagination murni: slice halaman 1-indexed dengan validasi input"
+description: >
+  Fungsi Python murni (tanpa FastAPI) untuk melatih pipeline grading paling
+  sederhana: hitung slice halaman, tolak input tak valid dengan ValueError.
+grader_type: unit_test
+estimated_minutes: 10
+timebox_seconds: 900
+status_default: available
+source_refs: [cs2023_ku, python_stdlib_pytest]
+signature_contract: "def paginate(items: list, page: int, per_page: int) -> list"
+scaffold_level: L2

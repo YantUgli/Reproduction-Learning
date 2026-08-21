@@ -1,0 +1,6 @@
+id: n005_probe_01
+node_id: n005_post_pydantic_body
+type: predict_output
+question: "POST /items dengan body {\"name\": \"pen\"} (price hilang). Status responsnya?"
+options: ["201", "200", "422", "500"]
+correct_answer: "422"

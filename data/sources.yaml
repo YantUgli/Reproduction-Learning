@@ -1,5 +1,6 @@
-# SourceRef awal (sumber otoritatif untuk edge prerequisite — PRD §9).
+# SourceRef — sumber otoritatif untuk node/edge (PRD §9).
 # type ∈ {cs2023_ku, textbook_toc, official_docs}
+# Ini daftar SourceRef kanonik; node.yaml & edges.yaml merujuk `id` di sini.
 sources:
   - id: cs2023_ku
     type: cs2023_ku
@@ -15,3 +16,33 @@ sources:
     type: official_docs
     citation: "FastAPI — Official Documentation"
     url_or_locator: "https://fastapi.tiangolo.com/"
+
+  - id: fastapi_docs_first_steps
+    type: official_docs
+    citation: "FastAPI — First Steps (basic GET route)"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/first-steps/"
+
+  - id: fastapi_docs_path_params
+    type: official_docs
+    citation: "FastAPI — Path Parameters"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/path-params/"
+
+  - id: fastapi_docs_query_params
+    type: official_docs
+    citation: "FastAPI — Query Parameters"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/query-params/"
+
+  - id: fastapi_docs_body
+    type: official_docs
+    citation: "FastAPI — Request Body (pydantic)"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/body/"
+
+  - id: fastapi_docs_handling_errors
+    type: official_docs
+    citation: "FastAPI — Handling Errors (HTTPException / 404)"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/handling-errors/"
+
+  - id: python_stdlib_pytest
+    type: official_docs
+    citation: "pytest — Getting Started / assert introspection"
+    url_or_locator: "https://docs.pytest.org/en/stable/getting-started.html"

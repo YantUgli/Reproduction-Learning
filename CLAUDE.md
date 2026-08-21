@@ -146,3 +146,22 @@ alasan · alternatif yang ditolak.
   dari venv ter-pin, isolasi cukup dari tempdir+timeout. *Ditolak:* Docker per
   attempt (latency & ops), Pyodide (rapuh untuk FastAPI, varians WASM merusak
   kepercayaan sinyal).
+
+- **2026-08-21 · M2 · `DATABASE_URL` jadi path ABSOLUT (`backend/app.db`), bukan
+  `sqlite:///./app.db` (cwd-relative) seperti default M0.** Alasan: uvicorn jalan
+  dari `backend/`, sedangkan `scripts/*.py` jalan dari repo root — default relatif
+  bikin DB terpecah jadi dua file (`./app.db` vs `backend/app.db`) tergantung cwd.
+  Path absolut menunjuk satu DB stabil. *Ditolak:* memaksa semua entrypoint chdir
+  (rapuh), atau env var `DATABASE_URL` wajib (beban setup untuk single-user local).
+
+- **2026-08-21 · M2 · Tambah dependency `pyyaml`.** Alasan: node/edge/source store
+  adalah YAML di `data/` (keputusan §2, PRD §11); loader butuh parser. Dep kecil,
+  standar, hanya untuk membaca data — bukan untuk backend eksekusi (yang tetap
+  stdlib-only per M1). *Ditolak:* parser YAML tulis-sendiri (buang waktu, rawan bug).
+
+- **2026-08-21 · M2 · Format node dibekukan: `signature_contract` & `scaffold_level`
+  hidup di `node.yaml` (level node), instance ditemukan dari folder `instances/*`.**
+  Alasan: format M2 tak mendaftar file meta per-varian; varian berbagi konsep &
+  kontrak yang sama (beda hanya data uji → transfer). `variant_label` = nama folder.
+  Edge final dibaca dari `edges.yaml` (bukan dari blok `edges:` di node.yaml) supaya
+  satu sumber kebenaran; blok edge di node.yaml (bila ada) hanya usulan, tak dimuat.

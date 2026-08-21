@@ -1,0 +1,10 @@
+id: n001_probe_01
+node_id: n001_paginate
+type: predict_output
+question: "paginate([10, 20, 30, 40, 50], 2, 2) mengembalikan apa?"
+options:
+  - "[10, 20]"
+  - "[30, 40]"
+  - "[20, 30]"
+  - "[]"
+correct_answer: "[30, 40]"

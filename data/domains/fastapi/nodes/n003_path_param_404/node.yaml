@@ -1,0 +1,13 @@
+id: n003_path_param_404
+domain_id: fastapi
+concept: "GET dengan path param bertipe; 404 via HTTPException jika resource tak ada"
+description: >
+  Ambil id dari path, kembalikan resource jika ada, atau HTTPException 404
+  jika tidak. Melatih path param bertipe + penanganan error dasar.
+grader_type: unit_test
+estimated_minutes: 15
+timebox_seconds: 1200
+status_default: locked
+source_refs: [fastapi_docs_path_params, fastapi_docs_handling_errors]
+signature_contract: "@app.get('/<res>/{id}') -> resource | HTTPException(404)"
+scaffold_level: L2

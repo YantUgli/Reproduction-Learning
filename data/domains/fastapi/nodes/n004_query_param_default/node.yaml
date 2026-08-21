@@ -1,0 +1,13 @@
+id: n004_query_param_default
+domain_id: fastapi
+concept: "Query param dengan nilai default & validasi tipe otomatis (422)"
+description: >
+  Deklarasikan query param bertipe dengan default. FastAPI memvalidasi tipe:
+  nilai tak sesuai -> 422. Melatih kontrak input yang deterministik.
+grader_type: unit_test
+estimated_minutes: 12
+timebox_seconds: 900
+status_default: locked
+source_refs: [fastapi_docs_query_params]
+signature_contract: "@app.get('<path>') def f(q: str = '', limit: int = <d>) -> dict"
+scaffold_level: L2
