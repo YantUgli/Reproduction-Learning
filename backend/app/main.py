@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import FRONTEND_ORIGIN
 from app.db import init_db
+from app.routers import attempts, nodes, probes
 
 
 @asynccontextmanager
@@ -27,6 +28,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(nodes.router)
+app.include_router(attempts.router)
+app.include_router(probes.router)
 
 
 @app.get("/health")

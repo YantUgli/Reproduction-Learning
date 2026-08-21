@@ -32,5 +32,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# `Depends(...)` di argument default adalah idiom resmi FastAPI (bukan bug B008).
+"app/routers/*.py" = ["B008"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

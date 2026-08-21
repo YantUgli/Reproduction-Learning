@@ -27,6 +27,7 @@ from app.models import (
     Domain,
     Edge,
     Node,
+    ScheduleItem,
     SourceRef,
 )
 from app.services.node_schema import EdgeYaml, NodeYaml, ProbeYaml, SourceRefYaml
@@ -245,6 +246,11 @@ def load_domain_into_db(
         )
         node_ids.add(meta.id)
         report.nodes += 1
+
+        # Seed ScheduleItem HANYA jika belum ada — reload node tak boleh menghapus
+        # progres (status acquired) yang sudah diperoleh Bryant.
+        if session.get(ScheduleItem, meta.id) is None:
+            session.add(ScheduleItem(node_id=meta.id, status=meta.status_default.value))
 
         for inst in bundle.instances:
             session.merge(

@@ -22,5 +22,11 @@ DATABASE_URL = f"sqlite:///{DB_PATH}"
 # (PRD §2 / CLAUDE.md — verifikasi via eksekusi, bukan AI.)
 MASTERY_SUCCESSES_DEFAULT = 4
 
+# BEDAKAN dua batas waktu (PRD §7.6, M3 Keputusan):
+# - timebox_seconds (per node, di DB) = batas waktu Bryant BERPIKIR (UI countdown).
+# - EXECUTION_TIMEOUT_SECONDS = batas kode MENGGANTUNG saat runner mengeksekusi.
+# Keduanya beda dan tak boleh disatukan.
+EXECUTION_TIMEOUT_SECONDS = 10
+
 # Origin frontend Next.js untuk CORS (dev).
 FRONTEND_ORIGIN = "http://localhost:3000"
