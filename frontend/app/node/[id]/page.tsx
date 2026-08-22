@@ -11,6 +11,7 @@ import {
   type ProbeAnswerOut,
   type SubmitOut,
 } from "../../../lib/api";
+import Markdown from "../../components/Markdown";
 import ProbeCard from "../../components/ProbeCard";
 import Timebox from "../../components/Timebox";
 
@@ -151,23 +152,34 @@ export default function NodeSession({ params }: { params: { id: string } }) {
       </div>
       <div style={{ fontFamily: "monospace", fontSize: 12, color: "#57606a" }}>{node.id}</div>
 
-      {/* Peta level — user selalu tahu posisinya */}
-      <div style={{ display: "flex", gap: 6, margin: "1rem 0" }}>
+      {/* Peta level — user selalu tahu posisinya, dan bisa lompat bebas
+          (mis. balik ke L3 melihat materi lagi). Aman untuk invariant §1:
+          L3–L1 tak mengirim attempt, sinyal reproduce-without-AI dihitung dari
+          attempt L0. */}
+      <div style={{ display: "flex", gap: 6, margin: "1rem 0", alignItems: "center" }}>
         {node.levels.map((lv, i) => (
-          <span
+          <button
             key={lv}
+            type="button"
+            onClick={() => goToLevel(i)}
+            title={i === levelIndex ? `Kamu di ${lv}` : `Lompat ke ${lv}`}
             style={{
               padding: "3px 10px",
               borderRadius: 6,
               fontSize: 13,
               fontWeight: 600,
+              border: "1px solid transparent",
+              cursor: "pointer",
               background: i === levelIndex ? "#0969da" : "#eaeef2",
               color: i === levelIndex ? "#fff" : "#57606a",
             }}
           >
             {lv}
-          </span>
+          </button>
         ))}
+        <span style={{ fontSize: 12, color: "#8c959f", marginLeft: 4 }}>
+          ← klik untuk pindah level (mis. balik ke L3 lihat materi)
+        </span>
       </div>
 
       <h2 style={{ fontSize: 18 }}>{level.title}</h2>
@@ -177,10 +189,9 @@ export default function NodeSession({ params }: { params: { id: string } }) {
           border: "1px solid #d0d7de",
           borderRadius: 8,
           padding: "0.5rem 1rem",
-          whiteSpace: "pre-wrap",
         }}
       >
-        {level.prompt}
+        <Markdown>{level.prompt}</Markdown>
       </div>
 
       {level.signature_contract && (

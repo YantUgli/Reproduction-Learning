@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Markdown from "./Markdown";
 import Timebox from "./Timebox";
 
 const SandboxEditor = dynamic(() => import("./SandboxEditor"), {
@@ -68,10 +69,9 @@ export default function ColdChallenge({
           border: "1px solid #d0d7de",
           borderRadius: 8,
           padding: "0.5rem 1rem",
-          whiteSpace: "pre-wrap",
         }}
       >
-        {prompt}
+        <Markdown>{prompt}</Markdown>
       </div>
 
       {signatureContract && (
