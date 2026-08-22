@@ -1,0 +1,14 @@
+id: n010_response_model_filter
+domain_id: fastapi
+concept: "response_model memfilter field: yang tak dideklarasikan di model output tak ikut keluar"
+description: >
+  Bentuk data yang masuk tidak sama dengan bentuk data yang boleh keluar.
+  response_model membuat kontrak keluaran eksplisit dan memotong field yang tak
+  dideklarasikan (mis. password) walau handler mengembalikan objek utuh.
+grader_type: unit_test
+estimated_minutes: 18
+timebox_seconds: 1200
+status_default: locked
+source_refs: [fastapi_docs_response_model]
+signature_contract: "@app.post('<path>', response_model=<Out>, status_code=201) def f(x: <In>)"
+scaffold_level: L2

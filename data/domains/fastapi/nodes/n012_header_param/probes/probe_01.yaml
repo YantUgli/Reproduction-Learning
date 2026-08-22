@@ -1,0 +1,10 @@
+id: n012_probe_01
+node_id: n012_header_param
+type: predict_output
+question: 'Param dideklarasikan `x_token: str = Header()`. Nama header HTTP yang harus dikirim klien agar terbaca?'
+options:
+  - x_token
+  - token
+  - x-token
+  - X_TOKEN
+correct_answer: x-token

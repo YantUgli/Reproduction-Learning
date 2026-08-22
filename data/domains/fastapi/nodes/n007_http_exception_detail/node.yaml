@@ -1,0 +1,14 @@
+id: n007_http_exception_detail
+domain_id: fastapi
+concept: "HTTPException dengan status non-404 (400/409) dan detail kustom"
+description: >
+  Kegagalan punya bentuk berbeda: input cacat (400) tidak sama dengan bentrok
+  keadaan (409). Melatih memilih status yang tepat dan mengembalikan detail
+  yang stabil lewat HTTPException, bukan mengembalikan dict error sendiri.
+grader_type: unit_test
+estimated_minutes: 15
+timebox_seconds: 1080
+status_default: locked
+source_refs: [fastapi_docs_handling_errors]
+signature_contract: "@app.post('<path>/{x}') def f(x: str): raise HTTPException(status_code=<409|400>, detail='<pesan>')"
+scaffold_level: L2

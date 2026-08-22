@@ -1,0 +1,14 @@
+id: n011_nested_body_list
+domain_id: fastapi
+concept: "Body bersarang: model di dalam model + list[Model], validasi menembus ke elemen"
+description: >
+  Body nyata jarang datar. Model bersarang dengan list[Model] membuat validasi
+  berlaku sampai ke tiap elemen: satu elemen cacat menggagalkan seluruh request
+  dengan 422, bukan lolos separuh.
+grader_type: unit_test
+estimated_minutes: 20
+timebox_seconds: 1500
+status_default: locked
+source_refs: [fastapi_docs_body_nested_models]
+signature_contract: "class Child(BaseModel); class Parent(BaseModel): items: list[Child]; @app.post('<path>', status_code=201) def f(p: Parent)"
+scaffold_level: L2

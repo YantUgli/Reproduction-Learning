@@ -1,0 +1,10 @@
+id: n011_probe_01
+node_id: n011_nested_body_list
+type: predict_output
+question: 'Order punya `lines: list[Line]` dengan `Line.qty: int`. POST body {"customer": "ada", "lines": [{"sku": "A", "qty": "two"}]} menghasilkan status berapa?'
+options:
+  - '200'
+  - '201'
+  - '400'
+  - '422'
+correct_answer: '422'

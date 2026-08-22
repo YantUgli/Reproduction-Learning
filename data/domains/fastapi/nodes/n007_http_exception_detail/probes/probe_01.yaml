@@ -1,0 +1,10 @@
+id: n007_probe_01
+node_id: n007_http_exception_detail
+type: predict_output
+question: Handler memanggil `raise HTTPException(status_code=409, detail="account already exists")`. Bentuk body JSON responsnya?
+options:
+  - '{"error": "account already exists"}'
+  - '{"detail": "account already exists"}'
+  - '{"message": "account already exists"}'
+  - '"account already exists"'
+correct_answer: '{"detail": "account already exists"}'

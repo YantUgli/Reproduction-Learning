@@ -1,0 +1,10 @@
+id: n009_probe_01
+node_id: n009_query_param_constraint
+type: predict_output
+question: '`q` dideklarasikan `str = Query(min_length=3)` (tanpa default). Request GET /search?q=ab menghasilkan status berapa?'
+options:
+  - '200'
+  - '400'
+  - '422'
+  - '404'
+correct_answer: '422'

@@ -1,0 +1,14 @@
+id: n013_depends_shared_params
+domain_id: fastapi
+concept: "Depends: satu fungsi dependency berisi param bersama, dipakai ulang oleh banyak route"
+description: >
+  Param yang sama di banyak route tak perlu diulang. Dependency adalah fungsi
+  biasa yang param-nya tetap dibaca FastAPI sebagai query param — termasuk
+  default dan validasi tipenya (422).
+grader_type: unit_test
+estimated_minutes: 20
+timebox_seconds: 1500
+status_default: locked
+source_refs: [fastapi_docs_dependencies]
+signature_contract: "def dep(a: int = <d>, b: int = <d>) -> dict; @app.get('<path>') def f(x: dict = Depends(dep))"
+scaffold_level: L2

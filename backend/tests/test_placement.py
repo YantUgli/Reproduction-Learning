@@ -15,7 +15,14 @@ import pytest
 from sqlmodel import Session, select
 
 from app.graders.unit_test import reference_solution_path
-from app.models import Attempt, ChallengeInstance, ScheduleItem, ScheduleStatus
+from app.models import (
+    Attempt,
+    ChallengeInstance,
+    Edge,
+    EdgeType,
+    ScheduleItem,
+    ScheduleStatus,
+)
 from app.services.placement import (
     compute_state,
     descending_order,
@@ -36,10 +43,19 @@ def _reference_code(session: Session, instance_id: str) -> str:
 def test_urutan_menurun_hilir_ke_primitif(session: Session):
     order = descending_order(session)
 
-    assert order[0] == "n005_post_pydantic_body"  # paling hilir
-    assert order[-1] == "n001_paginate"  # paling primitif
-    # n002 adalah prasyarat keras n003/n004/n005 → harus muncul SETELAH mereka.
-    assert order.index("n002_get_json_route") > order.index("n003_path_param_404")
+    # INVARIAN, bukan id hardcoded: kurikulum tumbuh tiap batch authoring, jadi node
+    # "paling hilir" berubah. Yang tak boleh berubah adalah PROPERTI urutan menurun —
+    # setiap node dependen muncul SEBELUM prasyarat kerasnya (makin hilir makin dulu).
+    hard_edges = session.exec(select(Edge).where(Edge.type == EdgeType.hard.value)).all()
+    assert hard_edges  # ada prasyarat keras yang membentuk urutan
+    for e in hard_edges:
+        assert order.index(e.to_node_id) < order.index(e.from_node_id), (
+            f"{e.to_node_id} (dependen) harus sebelum prasyarat {e.from_node_id} "
+            "dalam urutan menurun"
+        )
+
+    # n001 (fungsi murni, tanpa prasyarat keras, id terkecil) tetap paling primitif.
+    assert order[-1] == "n001_paginate"
 
 
 def test_sesi_dimulai_dari_node_paling_hilir(session: Session):

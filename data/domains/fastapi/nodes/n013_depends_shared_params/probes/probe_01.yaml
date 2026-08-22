@@ -1,0 +1,10 @@
+id: n013_probe_01
+node_id: n013_depends_shared_params
+type: predict_output
+question: 'Dependency `pagination(page: int = 1, size: int = 20)` mengembalikan offset = (page - 1) * size, dan route memakainya lewat Depends. GET /posts?page=3&size=10 -> berapa nilai offset di body?'
+options:
+  - '30'
+  - '20'
+  - '10'
+  - '0'
+correct_answer: '20'

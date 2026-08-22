@@ -1,0 +1,10 @@
+id: n010_probe_01
+node_id: n010_response_model_filter
+type: predict_output
+question: Handler `return user` (punya username, password, email) tapi route-nya `response_model=UserOut` yang hanya mendeklarasikan username & email. Body responsnya?
+options:
+  - '{"username": "ada", "password": "s3cret", "email": "ada@example.com"}'
+  - '{"username": "ada", "email": "ada@example.com"}'
+  - '{"username": "ada"}'
+  - 500 Internal Server Error
+correct_answer: '{"username": "ada", "email": "ada@example.com"}'

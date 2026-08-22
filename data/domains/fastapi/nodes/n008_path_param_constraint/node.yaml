@@ -1,0 +1,14 @@
+id: n008_path_param_constraint
+domain_id: fastapi
+concept: "Konstrain numerik path param via Path(gt=0) -> 422 sebelum handler jalan"
+description: >
+  Validasi nilai (bukan sekadar tipe) dideklarasikan di signature, bukan ditulis
+  sebagai if di dalam handler. Nilai di luar batas ditolak 422 sebelum satu baris
+  kode handler dijalankan.
+grader_type: unit_test
+estimated_minutes: 12
+timebox_seconds: 900
+status_default: locked
+source_refs: [fastapi_docs_path_params_numeric_validations]
+signature_contract: "@app.get('<path>/{x}') def f(x: int = Path(gt=0)) -> dict"
+scaffold_level: L2

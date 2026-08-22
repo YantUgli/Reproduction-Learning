@@ -1,0 +1,14 @@
+id: n012_header_param
+domain_id: fastapi
+concept: "Header param: wajib (422 bila hilang), opsional berdefault, underscore -> hyphen"
+description: >
+  Input request tak cuma path/query/body. Header dideklarasikan seperti param
+  lain; nama Python ber-underscore dipetakan ke nama header ber-hyphen, dan
+  header wajib yang hilang ditolak 422.
+grader_type: unit_test
+estimated_minutes: 15
+timebox_seconds: 1080
+status_default: locked
+source_refs: [fastapi_docs_header_params]
+signature_contract: "@app.get('<path>') def f(x_token: str = Header(), x_other: str | None = Header(default=<d>)) -> dict"
+scaffold_level: L2

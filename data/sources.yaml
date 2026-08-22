@@ -42,6 +42,42 @@ sources:
     citation: "FastAPI — Handling Errors (HTTPException / 404)"
     url_or_locator: "https://fastapi.tiangolo.com/tutorial/handling-errors/"
 
+  # --- USULAN A2 (batch n006–n013) — Isyah me-review sebelum dianggap final. ---
+  - id: fastapi_docs_response_status_code
+    type: official_docs
+    citation: "FastAPI — Response Status Code"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/response-status-code/"
+
+  - id: fastapi_docs_path_params_numeric_validations
+    type: official_docs
+    citation: "FastAPI — Path Parameters and Numeric Validations"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/path-params-numeric-validations/"
+
+  - id: fastapi_docs_query_params_str_validations
+    type: official_docs
+    citation: "FastAPI — Query Parameters and String Validations"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/query-params-str-validations/"
+
+  - id: fastapi_docs_response_model
+    type: official_docs
+    citation: "FastAPI — Response Model (Return Type)"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/response-model/"
+
+  - id: fastapi_docs_body_nested_models
+    type: official_docs
+    citation: "FastAPI — Body: Nested Models"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/body-nested-models/"
+
+  - id: fastapi_docs_header_params
+    type: official_docs
+    citation: "FastAPI — Header Parameters"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/header-params/"
+
+  - id: fastapi_docs_dependencies
+    type: official_docs
+    citation: "FastAPI — Dependencies: First Steps"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/dependencies/"
+
   - id: python_stdlib_pytest
     type: official_docs
     citation: "pytest — Getting Started / assert introspection"

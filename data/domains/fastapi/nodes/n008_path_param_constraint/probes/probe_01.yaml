@@ -1,0 +1,10 @@
+id: n008_probe_01
+node_id: n008_path_param_constraint
+type: predict_output
+question: '`item_id` dideklarasikan `int = Path(gt=0)`. Request GET /items/0 menghasilkan status berapa?'
+options:
+  - '200'
+  - '400'
+  - '404'
+  - '422'
+correct_answer: '422'

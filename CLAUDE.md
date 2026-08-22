@@ -261,3 +261,18 @@ alasan · alternatif yang ditolak.
   kontrak yang sama (beda hanya data uji → transfer). `variant_label` = nama folder.
   Edge final dibaca dari `edges.yaml` (bukan dari blok `edges:` di node.yaml) supaya
   satu sumber kebenaran; blok edge di node.yaml (bila ada) hanya usulan, tak dimuat.
+
+- **2026-08-22 · A2 · `test_node_loader` tak lagi mengunci JUMLAH node (5) & edge (4);
+  ia menegakkan bentuk + subset node A1.** Batch A2 (n006–n013) membuat dua test M2 merah
+  hanya karena kurikulum bertambah — padahal yang layak dijaga adalah invarian bentuk
+  (≥2 varian/node, ≥1 probe/node, pointer `hidden_test_path` relatif POSIX, idempotensi),
+  bukan ukuran kurikulum. Sekarang: batas bawah + `A1_NODE_IDS <= {node di DB}` (node A1
+  tak boleh hilang), dan idempotensi dibandingkan terhadap hasil muatan pertama, bukan
+  angka literal. *Ditolak:* menaikkan angka literal tiap batch authoring (test jadi
+  pekerjaan rumah tiap node baru, dan tetap tak menangkap regresi bentuk).
+
+- **2026-08-22 · A2 · Satu probe per node (probe_01), bukan 2–3.** `routers/nodes.py`
+  dan `routers/review.py` mengambil probe dengan `.first()`, jadi probe kedua tak akan
+  pernah tampil — menulisnya = konten mati yang tetap harus di-review. Urutan `options`
+  juga sengaja divariasikan posisinya (UI `ProbeCard` merender apa adanya, tanpa
+  pengacakan); jawaban benar yang selalu di posisi 1 melatih posisi, bukan konsep.

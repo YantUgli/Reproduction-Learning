@@ -1,124 +1,102 @@
-# Edge prerequisite antar node A1 (n001..n005) + A2 (n006..n013).
+# USULAN edge prerequisite untuk batch A2 (n006–n013). BUKAN file otoritatif.
 #
-# INVARIANT (PRD §1/§4): edge berasal dari sumber otoritatif + KEPUTUSAN ISYAH.
-# Hanya `type: hard` yang mengikat urutan; node independen bebas diambil.
-# Bryant tidak pernah menyentuh file ini (validitas — §1 PRD).
+# INVARIANT (PRD §1/§4, CLAUDE.md §1.4): edge final berasal dari sumber otoritatif
+# + KEPUTUSAN ISYAH, dan hanya hidup di `edges.yaml`. File ini adalah kandidat yang
+# di-draft dari struktur tutorial resmi FastAPI — `type: hard|soft` di sini semuanya
+# USULAN. Loader TIDAK membaca file ini; ia hanya membaca `edges.yaml`.
 #
-# Edge A2 (n006..n013) difinalkan Isyah 2026-08-22 dengan menerima seluruh
-# kandidat dari `edges.proposed.yaml` apa adanya (sitasi resmi FastAPI per edge).
+# Cara pakai: Isyah prune/ubah, lalu salin yang disetujui ke `edges.yaml`.
+# Konsekuensi bila belum disalin: node A2 tak punya prasyarat keras di DB, jadi
+# dashboard menampilkannya `available` (bukan `locked`) — tak ada urutan yang mengikat.
 #
 # Arah: from = prasyarat, to = yang bergantung.
 edges:
-  # n001 (fungsi murni + pytest) melatih pipeline grade; membantu tapi tak wajib.
-  - from: n001_paginate
-    to: n002_get_json_route
-    type: soft
-    source_ref_id: fastapi_docs_first_steps
-    note: "Fluensi fungsi Python + pytest memudahkan route pertama; bukan prasyarat keras."
-
-  # Route GET dasar adalah fondasi keras untuk path param + 404.
-  - from: n002_get_json_route
-    to: n003_path_param_404
-    type: hard
-    source_ref_id: fastapi_docs_path_params
-    note: "Path param dibangun di atas route GET dasar."
-
-  # Route GET dasar adalah fondasi keras untuk query param.
-  - from: n002_get_json_route
-    to: n004_query_param_default
-    type: hard
-    source_ref_id: fastapi_docs_query_params
-    note: "Query param memerlukan pemahaman route GET dasar."
-
-  # Route dasar adalah fondasi keras untuk POST body pydantic.
-  - from: n002_get_json_route
-    to: n005_post_pydantic_body
-    type: hard
-    source_ref_id: fastapi_docs_body
-    note: "POST body dibangun di atas mekanika route dasar."
-
-  # ----- A2 (n006..n013) — difinalkan Isyah 2026-08-22 -----------------------
-
-  # n006 status code eksplisit
+  # --- n006 status code eksplisit ---------------------------------------------
   - from: n002_get_json_route
     to: n006_explicit_status_code
     type: hard
     source_ref_id: fastapi_docs_response_status_code
     note: "Memilih status code per-route mengandaikan mekanika route dasar sudah ada."
+
   - from: n005_post_pydantic_body
     to: n006_explicit_status_code
     type: soft
     source_ref_id: fastapi_docs_response_status_code
     note: "n005 sudah memperkenalkan status_code=201; n006 memperluas ke 202/204. Membantu, tak wajib."
 
-  # n007 HTTPException non-404
+  # --- n007 HTTPException non-404 ---------------------------------------------
   - from: n003_path_param_404
     to: n007_http_exception_detail
     type: hard
     source_ref_id: fastapi_docs_handling_errors
     note: "HTTPException pertama kali dipakai di n003 (404); n007 memperluas ke 400/409 + detail kustom."
 
-  # n008 konstrain path param
+  # --- n008 konstrain path param ----------------------------------------------
   - from: n003_path_param_404
     to: n008_path_param_constraint
     type: hard
     source_ref_id: fastapi_docs_path_params_numeric_validations
     note: "Konstrain numerik menempel pada path param yang sudah dikuasai di n003."
 
-  # n009 konstrain query param
+  # --- n009 konstrain query param ---------------------------------------------
   - from: n004_query_param_default
     to: n009_query_param_constraint
     type: hard
     source_ref_id: fastapi_docs_query_params_str_validations
     note: "Query(min_length/ge/le) adalah lanjutan langsung query param berdefault (n004)."
+
   - from: n008_path_param_constraint
     to: n009_query_param_constraint
     type: soft
     source_ref_id: fastapi_docs_query_params_str_validations
     note: "Pola 'batas dideklarasikan di signature, pelanggaran = 422' sama; urutan ini menghemat kejutan."
 
-  # n010 response_model
+  # --- n010 response_model ------------------------------------------------------
   - from: n005_post_pydantic_body
     to: n010_response_model_filter
     type: hard
     source_ref_id: fastapi_docs_response_model
     note: "response_model menuntut model pydantic sudah bisa didefinisikan & dipakai sebagai body."
+
   - from: n006_explicit_status_code
     to: n010_response_model_filter
     type: soft
     source_ref_id: fastapi_docs_response_model
     note: "Route n010 memakai status_code=201 bersamaan response_model; bukan prasyarat konsep."
 
-  # n011 body bersarang
+  # --- n011 body bersarang ------------------------------------------------------
   - from: n005_post_pydantic_body
     to: n011_nested_body_list
     type: hard
     source_ref_id: fastapi_docs_body_nested_models
     note: "Model bersarang adalah komposisi dari model body datar (n005)."
+
   - from: n010_response_model_filter
     to: n011_nested_body_list
     type: soft
     source_ref_id: fastapi_docs_body_nested_models
     note: "Keduanya melatih 'bentuk data itu kontrak'; n010 lebih dulu bikin n011 terasa wajar."
 
-  # n012 header param
+  # --- n012 header param --------------------------------------------------------
   - from: n002_get_json_route
     to: n012_header_param
     type: hard
     source_ref_id: fastapi_docs_header_params
     note: "Header dideklarasikan di signature route GET; butuh route dasar."
+
   - from: n004_query_param_default
     to: n012_header_param
     type: soft
     source_ref_id: fastapi_docs_header_params
     note: "Header memakai pola deklarasi param yang sama dengan query param (wajib vs berdefault)."
 
-  # n013 Depends
+  # --- n013 Depends -------------------------------------------------------------
   - from: n004_query_param_default
     to: n013_depends_shared_params
     type: hard
     source_ref_id: fastapi_docs_dependencies
     note: "Param dependency tetap dibaca sebagai query param; tanpa n004 perilaku default/422-nya tak terbaca."
+
   - from: n009_query_param_constraint
     to: n013_depends_shared_params
     type: soft

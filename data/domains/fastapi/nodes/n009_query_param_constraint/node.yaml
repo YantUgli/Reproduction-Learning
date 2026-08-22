@@ -1,0 +1,14 @@
+id: n009_query_param_constraint
+domain_id: fastapi
+concept: "Query param wajib berkonstrain: Query(min_length=...) & Query(ge=..., le=...) -> 422"
+description: >
+  Lanjutan query param berdefault: di sini param string WAJIB dan punya panjang
+  minimum, sedangkan param angka punya rentang. Batas ditulis di signature, dan
+  pelanggaran apa pun berbalas 422 secara deterministik.
+grader_type: unit_test
+estimated_minutes: 15
+timebox_seconds: 1080
+status_default: locked
+source_refs: [fastapi_docs_query_params_str_validations]
+signature_contract: "@app.get('<path>') def f(q: str = Query(min_length=<n>), limit: int = Query(default=<d>, ge=<a>, le=<b>)) -> dict"
+scaffold_level: L2

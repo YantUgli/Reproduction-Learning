@@ -1,0 +1,14 @@
+id: n006_explicit_status_code
+domain_id: fastapi
+concept: "Status code eksplisit per-route: 202 Accepted & 204 No Content (body kosong)"
+description: >
+  Status sukses bukan hanya 200. Route yang menerima kerja untuk nanti balas 202;
+  route yang berhasil tanpa punya apa pun untuk dikembalikan balas 204 dengan body
+  0 byte. Melatih memilih kode sukses yang benar, bukan menempel 200 di semuanya.
+grader_type: unit_test
+estimated_minutes: 12
+timebox_seconds: 900
+status_default: locked
+source_refs: [fastapi_docs_response_status_code]
+signature_contract: "@app.post('<path>', status_code=202) / @app.delete('<path>/{id}', status_code=204)"
+scaffold_level: L2
