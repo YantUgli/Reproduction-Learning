@@ -13,6 +13,7 @@ __pycache__/
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 npm-debug.log*
 yarn-error.log*
 

@@ -1,11 +1,14 @@
-"""Orkestrasi Attempt (M3): submit → grade → (probe) → simpan.
+"""Orkestrasi Attempt (M3, diperluas M4): submit → grade → (probe) → simpan.
 
 INVARIANT:
 - Hanya eksekusi kode (grader → Executor) yang menentukan `result` (§2).
 - SETIAP attempt disimpan, termasuk gagal & lewat-timebox — itu data sinyal inti
   (`reproduce-without-AI pass rate`, §9 KPI).
-- `acquired` di-set HANYA saat L0 (verification) `result=pass` DAN probe benar.
-  `mastered` TIDAK diklaim di M3 (butuh FSRS berjarak — M4).
+- `acquired` di-set HANYA saat `result=pass` DAN probe benar.
+
+M4: transisi status & penjadwalan TIDAK lagi dikerjakan di sini — semuanya lewat
+`services/mastery.apply_outcome`, supaya jalur akuisisi (L0 + probe), review harian,
+dan placement memakai aturan yang PERSIS sama.
 """
 
 from dataclasses import dataclass
@@ -13,28 +16,23 @@ from dataclasses import dataclass
 from sqlmodel import Session, select
 
 from app.graders import GradeResult, get_grader
-from app.models import (
-    Attempt,
-    ChallengeInstance,
-    ComprehensionProbe,
-    Node,
-    ScheduleItem,
-    ScheduleStatus,
-)
+from app.models import Attempt, ChallengeInstance, ComprehensionProbe, Node
+from app.services.mastery import Outcome, apply_outcome, ensure_schedule_item
+
+__all__ = [
+    "SubmitResult",
+    "ProbeOutcome",
+    "ensure_schedule_item",
+    "submit_attempt",
+    "answer_probe",
+    "node_attempts",
+]
 
 
 @dataclass
 class SubmitResult:
     attempt: Attempt
     grade: GradeResult
-
-
-def ensure_schedule_item(session: Session, node: Node) -> ScheduleItem:
-    item = session.get(ScheduleItem, node.id)
-    if item is None:
-        item = ScheduleItem(node_id=node.id, status=node.status_default)
-        session.add(item)
-    return item
 
 
 def submit_attempt(
@@ -46,6 +44,8 @@ def submit_attempt(
     submitted_code: str,
     duration_seconds: int,
     timebox_exceeded: bool = False,
+    mode: str | None = None,
+    session_id: int | None = None,
 ) -> SubmitResult:
     node = session.get(Node, node_id)
     if node is None:
@@ -57,8 +57,10 @@ def submit_attempt(
     grader = get_grader(node.grader_type)
     grade = grader.grade(instance, submitted_code)
 
-    # Level L0 = verifikasi; level lain = akuisisi (latihan berscaffold).
-    mode = "verification" if scaffold_level == "L0" else "acquisition"
+    # Mode boleh dipaksa oleh pemanggil (review/placement); default dari scaffold:
+    # L0 = verifikasi, level lain = akuisisi (latihan berscaffold).
+    if mode is None:
+        mode = "verification" if scaffold_level == "L0" else "acquisition"
 
     test_output = grade.test_output
     if timebox_exceeded:
@@ -69,6 +71,7 @@ def submit_attempt(
     attempt = Attempt(
         node_id=node_id,
         instance_id=instance_id,
+        session_id=session_id,
         mode=mode,
         scaffold_level=scaffold_level,
         duration_seconds=duration_seconds,
@@ -89,6 +92,12 @@ def submit_attempt(
 class ProbeOutcome:
     probe_correct: bool
     acquired: bool
+    outcome: Outcome | None  # None bila attempt ini bukan attempt bergerbang
+
+
+# Mode yang hasilnya menggerakkan status & jadwal. Attempt berscaffold (`acquisition`)
+# sengaja TIDAK ikut: itu latihan, bukan bukti reproduce-without-AI.
+_GATED_MODES = ("verification", "review")
 
 
 def answer_probe(
@@ -108,19 +117,20 @@ def answer_probe(
     # Pengecekan DETERMINISTIK — cocokkan string jawaban dengan correct_answer.
     probe_correct = answer == probe.correct_answer
     attempt.probe_result = "correct" if probe_correct else "incorrect"
-
-    acquired = False
-    if attempt.mode == "verification" and attempt.result == "pass" and probe_correct:
-        node = session.get(Node, attempt.node_id)
-        item = ensure_schedule_item(session, node)
-        item.status = ScheduleStatus.acquired.value
-        item.consecutive_success = (item.consecutive_success or 0) + 1
-        session.add(item)
-        acquired = True
-
     session.add(attempt)
     session.commit()
-    return ProbeOutcome(probe_correct=probe_correct, acquired=acquired)
+
+    outcome: Outcome | None = None
+    if attempt.mode in _GATED_MODES:
+        outcome = apply_outcome(
+            session,
+            node_id=attempt.node_id,
+            test_passed=attempt.result == "pass",
+            probe_correct=probe_correct,
+        )
+
+    acquired = bool(outcome and outcome.status in ("acquired", "mastered"))
+    return ProbeOutcome(probe_correct=probe_correct, acquired=acquired, outcome=outcome)
 
 
 def node_attempts(session: Session, node_id: str) -> list[Attempt]:

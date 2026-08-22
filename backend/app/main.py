@@ -1,6 +1,7 @@
-"""FastAPI app — M0 scaffolding.
+"""FastAPI app.
 
-Belum ada fitur; hanya rangka hidup: init DB saat startup + route /health.
+Init DB saat startup + pasang seluruh router. Loop penuh M4: node/attempt/probe
+(akuisisi) + placement (menemukan lantai) + review (jatuh tempo) + stats (KPI).
 """
 
 from contextlib import asynccontextmanager
@@ -10,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import FRONTEND_ORIGIN
 from app.db import init_db
-from app.routers import attempts, nodes, probes
+from app.routers import attempts, nodes, placement, probes, review, stats
 
 
 @asynccontextmanager
@@ -33,6 +34,9 @@ app.add_middleware(
 app.include_router(nodes.router)
 app.include_router(attempts.router)
 app.include_router(probes.router)
+app.include_router(placement.router)
+app.include_router(review.router)
+app.include_router(stats.router)
 
 
 @app.get("/health")

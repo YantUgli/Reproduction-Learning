@@ -19,17 +19,48 @@ from pathlib import Path
 
 from app.executor.base import ExecutionResult
 
+_IS_WINDOWS = os.name == "nt"
+
 # Variabel env minimal yang diwariskan ke subprocess. Sengaja whitelist, bukan
 # blacklist: kredensial/API key (ANTHROPIC_API_KEY, dll) tak akan pernah bocor,
 # dan environment test jadi deterministik.
 _ENV_WHITELIST = ("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR")
 
+# Windows menolak jalan tanpa beberapa variabel ini. SYSTEMROOT khususnya wajib:
+# tanpanya inisialisasi Winsock gagal ("requested service provider could not be
+# loaded or initialized") — dan itu mematikan seluruh node FastAPI yang di-grade
+# lewat TestClient. Semuanya variabel sistem, bukan kredensial; whitelist tetap utuh.
+_ENV_WHITELIST_WINDOWS = (
+    "SYSTEMROOT",
+    "SYSTEMDRIVE",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "TEMP",
+    "TMP",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+)
+
 
 def _clean_env() -> dict[str, str]:
-    env = {k: os.environ[k] for k in _ENV_WHITELIST if k in os.environ}
+    names = _ENV_WHITELIST + (_ENV_WHITELIST_WINDOWS if _IS_WINDOWS else ())
+    env = {k: os.environ[k] for k in names if k in os.environ}
     # Nonaktifkan pengumpulan cache pytest & bytecode agar tempdir bersih.
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
+
+
+def _group_kwargs() -> dict[str, object]:
+    """Taruh subprocess di grup proses sendiri supaya timeout bisa membunuh SELURUH
+    pohon proses (termasuk anak yang di-spawn), bukan cuma pytest-nya.
+
+    POSIX: `start_new_session=True` (setsid). Windows: `start_new_session` diabaikan
+    oleh subprocess, jadi pakai CREATE_NEW_PROCESS_GROUP.
+    """
+    if _IS_WINDOWS:
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
 
 
 class SubprocessExecutor:
@@ -50,9 +81,6 @@ class SubprocessExecutor:
 
             cmd = [sys.executable, "-m", "pytest", test_entry, "-q", "-p", "no:cacheprovider"]
 
-            # start_new_session=True menaruh subprocess di grup proses sendiri,
-            # sehingga saat timeout kita bisa membunuh SELURUH grup (termasuk anak
-            # yang mungkin di-spawn), tidak menyisakan proses menggantung/zombie.
             start = time.monotonic()
             proc = subprocess.Popen(
                 cmd,
@@ -61,7 +89,7 @@ class SubprocessExecutor:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                start_new_session=True,
+                **_group_kwargs(),
             )
             timed_out = False
             try:
@@ -85,7 +113,24 @@ class SubprocessExecutor:
 
 
 def _kill_process_group(proc: subprocess.Popen) -> None:
-    """Bunuh seluruh grup proses subprocess (SIGKILL) lalu tunggu reap."""
+    """Bunuh seluruh pohon proses subprocess lalu tunggu reap."""
+    if _IS_WINDOWS:
+        # Windows tak punya killpg; taskkill /T membunuh proses + seluruh anaknya.
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True,
+                check=False,
+            )
+        except OSError:
+            pass
+        # taskkill kadang meleset (proses sudah keburu keluar) — pastikan mati.
+        try:
+            proc.kill()
+        except OSError:
+            pass
+        return
+
     try:
         pgid = os.getpgid(proc.pid)
         os.killpg(pgid, signal.SIGKILL)

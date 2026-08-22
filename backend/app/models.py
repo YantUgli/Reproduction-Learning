@@ -156,6 +156,9 @@ class Attempt(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     node_id: str = Field(foreign_key="node.id")
     instance_id: str | None = Field(default=None, foreign_key="challengeinstance.id")
+    # Sesi pemilik attempt (M4). Wajib untuk placement: urutan attempt dalam SATU
+    # sesi placement-lah yang menentukan di mana batas fail→pass ditemukan.
+    session_id: int | None = Field(default=None, foreign_key="session.id")
     timestamp: datetime = Field(default_factory=_utcnow)
     # mode ∈ {placement, acquisition, verification, review}
     mode: str
@@ -184,6 +187,7 @@ class SkillHypothesis(SQLModel, table=True):
 
 class ScheduleItem(SQLModel, table=True):
     # Satu baris jadwal per node (PK = node_id).
+    # Yang dijadwalkan adalah REPRODUKSI node, bukan kartu untuk dikenali (PRD §7.5).
     node_id: str = Field(primary_key=True, foreign_key="node.id")
     fsrs_stability: float | None = None
     fsrs_difficulty: float | None = None
@@ -192,6 +196,13 @@ class ScheduleItem(SQLModel, table=True):
     consecutive_success: int = 0
     # status ∈ {locked, available, acquired, mastered, lapsed}
     status: str = Field(default=ScheduleStatus.locked.value)
+    # --- Sisa state kartu FSRS (M4) ---
+    # py-fsrs butuh state+step+last_review untuk melanjutkan kartu, bukan cuma
+    # stability/difficulty/due. Disimpan supaya kartu bisa dipulihkan utuh dari DB.
+    # fsrs_state ∈ {Learning, Review, Relearning} (nama State py-fsrs).
+    fsrs_state: str | None = None
+    fsrs_step: int | None = None
+    last_review_at: datetime | None = None
 
 
 class Session(SQLModel, table=True):

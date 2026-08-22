@@ -136,12 +136,17 @@ node jadi `mastered` setelah N=4; sengaja gagalkan review → `lapsed` + interva
 
 ## Acceptance criteria
 
-- [ ] Gerbang 0 tercatat sebagai "lanjut" di CLAUDE.md §7 sebelum M4 dimulai.
-- [ ] `py-fsrs` terpasang; **tidak ada** algoritma SR buatan sendiri.
-- [ ] Transisi status lengkap & teruji: `acquired`, `mastered` (N=4 berjarak),
-      `lapsed` (reset interval).
-- [ ] Placement probe berhenti di batas fail→pass pertama, node maksimum terputuskan.
-- [ ] Review harian memakai instance berbeda dan menjadwal ulang lewat FSRS.
-- [ ] Dashboard menampilkan KPI `reproduce-without-AI pass rate` & jumlah `mastered`;
+- [x] Gerbang 0 tercatat sebagai "lanjut" di CLAUDE.md §7 sebelum M4 dimulai.
+- [x] `py-fsrs` terpasang; **tidak ada** algoritma SR buatan sendiri.
+      (`fsrs>=6,<7`; `services/scheduler.py` hanya memetakan verdict↔Rating dan
+      ScheduleItem↔Card.)
+- [x] Transisi status lengkap & teruji: `acquired`, `mastered` (N=4 berjarak),
+      `lapsed` (reset interval). — `tests/test_mastery.py`, termasuk uji bahwa 4 sukses
+      dalam SATU sesi **tidak** memberi `mastered`.
+- [x] Placement probe berhenti di batas fail→pass pertama, node maksimum terputuskan
+      (`PLACEMENT_MAX_NODES = 7`, PRD Q4). — `tests/test_placement.py`.
+- [x] Review harian memakai instance berbeda dan menjadwal ulang lewat FSRS.
+      — `tests/test_review_flow.py`.
+- [x] Dashboard menampilkan KPI `reproduce-without-AI pass rate` & jumlah `mastered`;
       tetap daftar linear (bukan graf).
-- [ ] Open question PRD Q3, Q4, Q5 diputuskan & dicatat di CLAUDE.md §7.
+- [x] Open question PRD Q3, Q4, Q5 diputuskan & dicatat di CLAUDE.md §7.

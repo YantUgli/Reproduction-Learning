@@ -129,9 +129,15 @@ cd backend && uvicorn app.main:app --reload
 # Test + lint backend
 cd backend && pytest && ruff check .
 
+# Muat seluruh node data/ ke SQLite (idempoten; jalankan dari repo root)
+python scripts/load_nodes.py
+
 # Frontend (M3+)
 cd frontend && npm run dev
 ```
+
+Halaman frontend (M4): `/` dashboard + KPI · `/node/[id]` sesi akuisisi L3→L0 ·
+`/placement` menemukan lantai · `/review` sesi review jatuh tempo.
 
 ---
 
@@ -158,6 +164,96 @@ alasan · alternatif yang ditolak.
   adalah YAML di `data/` (keputusan §2, PRD §11); loader butuh parser. Dep kecil,
   standar, hanya untuk membaca data — bukan untuk backend eksekusi (yang tetap
   stdlib-only per M1). *Ditolak:* parser YAML tulis-sendiri (buang waktu, rawan bug).
+
+- **2026-08-21 · GERBANG 0 · Keputusan: LANJUT (build).** Isyah menginstruksikan
+  eksekusi M4 setelah M3 selesai; per M4 §"Gerbang 0 wajib", keputusan build-vs-buy
+  dicatat di sini sebagai **lanjut**, dan sejak titik ini mengikat: A2 + Fase 2 boleh
+  jalan, biaya sesungguhnya (±20 node + FSRS + dashboard) diterima. *Ditolak:* berhenti
+  di M3 dan memakai Execute Program (~$39/bln) saja — ia menutup primitif bahasa, tapi
+  tidak menutup lapisan unit framework (FastAPI) yang justru jadi domain pertama, dan
+  tak memberi sinyal `reproduce-without-AI` atas kurikulum milik Isyah sendiri.
+  **Catatan jujur:** kalau ±1 bulan pemakaian Execute Program ternyata belum dijalankan,
+  keputusan ini diambil tanpa data pembanding yang direncanakan PRD §12/RISK-5 —
+  membalikkannya paling murah dilakukan SEKARANG, sebelum A2 (~30–60 jam) berjalan.
+
+- **2026-08-22 · GERBANG 0 · Dikonfirmasi FINAL: BUILD sampai proyek selesai.** Isyah
+  menegaskan M3 **tidak cukup** untuk kebutuhan Bryant; jalur build diteruskan sampai
+  proyek rampung, bukan berhenti di M3. Ini menutup "catatan jujur" entri 2026-08-21:
+  trial pembanding Execute Program **tidak akan** dijalankan sebagai gerbang — keputusan
+  build diambil atas dasar konviksi kebutuhan (lapisan unit framework + sinyal
+  `reproduce-without-AI` atas kurikulum sendiri tak tersedia di produk jadi). Konsekuensi:
+  A2 (~30–60 jam authoring) & Fase 2+ berjalan penuh; titik pembalikan termurah dilepas
+  secara sadar. *Ditolak:* menahan roadmap menunggu 1 bulan trial (menunda tanpa mengubah
+  hasil, karena kebutuhan sudah jelas).
+
+- **2026-08-21 · M4 · PRD Q5 · Hasil probe IKUT memberi rating FSRS, bukan sekadar
+  gate.** Pemetaan tunggal di `services/scheduler.py`: test FAIL → `Again`; test PASS +
+  probe SALAH → `Hard`; test PASS + probe BENAR → `Good`; test PASS tanpa probe
+  (placement) → `Good`. Alasan: verdict biner membuang informasi yang sudah kita punya
+  gratis — "bisa memproduksi tapi tak paham kenapa" jelas lebih rapuh daripada lolos
+  bersih, dan itu persis yang dimodelkan `Hard`. **Batas keras:** probe hanya memengaruhi
+  *interval*, tak pernah *menurunkan status* — hanya kegagalan eksekusi yang boleh
+  membuat node `lapsed` (§2). `Easy` sengaja tak dipakai: tak ada sinyal deterministik
+  ketiga; memakai durasi sebagai proksi = menjadwal dari angka berisik. *Ditolak:* probe
+  murni gate (membuang sinyal), probe ikut menurunkan status (menggores §2).
+
+- **2026-08-21 · M4 · PRD Q3 · `lapsed` kembali ke `acquired`, bukan `available`
+  penuh.** Sekali pulih (lolos bersih lagi), node jadi `acquired` dengan
+  `consecutive_success` direset ke 0 dan interval FSRS reset. Alasan: `available`
+  berarti "belum pernah dibuktikan", padahal Bryant PERNAH memproduksinya — yang meluruh
+  memorinya, bukan buktinya. Konsekuensi yang ikut diputuskan: **`lapsed` tidak mengunci
+  ulang node hilirnya** (`progress.py` menganggap acquired/mastered/lapsed sama-sama
+  "pernah dibuktikan"), supaya satu review buruk tak merobohkan separuh peta.
+  *Ditolak:* turun ke `available` (menghapus bukti + thrashing lock di dashboard).
+
+- **2026-08-21 · M4 · PRD Q4 · Placement maksimum 7 node per sesi
+  (`PLACEMENT_MAX_NODES`), urutan menurun linear, berhenti di batas fail→pass pertama.**
+  Sesi hampir selalu berhenti jauh lebih cepat; batas ini melindungi kasus terburuk
+  (gagal terus sampai dasar) agar placement tak jadi maraton reproduksi yang justru
+  merusak sinyalnya. Batas tercapai tanpa pass → `exhausted`, **tak ada status yang
+  diberikan** ke node mana pun. *Ditolak:* binary search atas urutan node (lebih sedikit
+  langkah, tapi menyimpang dari "rangkaian menurun" PRD dan sulit dibaca Bryant saat
+  sesi berjalan), dan tanpa batas sama sekali.
+
+- **2026-08-21 · M4 · Efek lantai placement: node lantai → `acquired`; prasyarat
+  transitifnya hanya DIBUKA jadi `available`.** Node lantai lolos eksekusi tanpa
+  scaffold apa pun — reproduksi lebih dingin daripada L0 di jalur akuisisi — jadi
+  `acquired` tetap diputuskan eksekusi kode (§2 utuh) meski placement tak memakai probe.
+  Prasyaratnya tak pernah dieksekusi, jadi maksimal dibuka; membuka ≠ mengklaim mastery.
+  *Ditolak:* menandai seluruh prasyarat `acquired` (mengasumsikan — melanggar premis
+  "lantai ditemukan"), atau membiarkannya `locked` (absurd: hilirnya sudah terbukti).
+
+- **2026-08-21 · M4 · FSRS disetel tanpa learning/relearning steps & tanpa fuzzing.**
+  Default py-fsrs punya learning step 1 menit & 10 menit — masuk akal untuk flashcard,
+  absurd untuk tantangan reproduksi 20–40 menit; dikosongkan supaya interval berskala
+  HARI sejak review pertama. Fuzzing dimatikan: single-user tak punya beban deck yang
+  perlu disebar, sementara interval deterministik jauh lebih mudah di-debug & di-test.
+  Algoritmanya tetap 100% milik py-fsrs (§2).
+
+- **2026-08-21 · M4 · Tambah kolom: `ScheduleItem.fsrs_state/fsrs_step/last_review_at`
+  dan `Attempt.session_id`; `db.init_db()` menambal kolom via `ALTER TABLE ADD COLUMN`.**
+  py-fsrs butuh state+step+last_review untuk melanjutkan kartu (bukan cuma
+  stability/difficulty/due); `Attempt.session_id` membuat tabel `Session` yang selama ini
+  yatim jadi berguna — urutan attempt dalam SATU sesi placement-lah yang menentukan di
+  mana batas fail→pass ditemukan. Migrasi ringan dipilih karena `create_all()` tak pernah
+  menambah kolom ke tabel lama, dan tanpanya DB M3 milik Bryant harus dihapus (= progres
+  hilang). *Ditolak:* Alembic (dep + direktori migrasi + ops untuk satu file .db
+  single-user), dan "hapus app.db saja" (menghapus data sinyal inti).
+
+- **2026-08-21 · M4 · KPI `reproduce-without-AI pass rate` dihitung HANYA dari attempt
+  mode `verification`/`review`/`placement`.** Attempt mode `acquisition` (L3–L1, scaffold
+  masih di layar) tidak dihitung. Alasan: memasukkannya menggelembungkan angkanya dengan
+  latihan bersontekan — dan KPI yang menggelembung persis adalah illusion of competence
+  yang produk ini dibangun untuk melawan.
+
+- **2026-08-21 · M4 · Perbaikan bawaan M1/M2 yang ditemukan saat verifikasi di Windows.**
+  (a) `SubprocessExecutor` gagal total di Windows karena `_ENV_WHITELIST` tak memuat
+  `SYSTEMROOT` (Winsock gagal init → *semua* node FastAPI ter-grade FAIL), dan
+  `os.killpg`/`SIGKILL` POSIX-only; sekarang whitelist punya cabang Windows dan timeout
+  membunuh pohon proses lewat `taskkill /T`. (b) `node_loader._rel_to_repo` menyimpan
+  `hidden_test_path` dengan `\` di Windows; sekarang selalu POSIX (`as_posix`) supaya
+  pointer di DB tak berubah bentuk tergantung OS penulisnya. Tanpa keduanya, 6 test M1–M3
+  merah dan M4 tak mungkin diverifikasi.
 
 - **2026-08-21 · M2 · Format node dibekukan: `signature_contract` & `scaffold_level`
   hidup di `node.yaml` (level node), instance ditemukan dari folder `instances/*`.**

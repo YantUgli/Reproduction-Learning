@@ -8,6 +8,7 @@ import {
   type LevelView,
   type NodeDetail,
   type Probe,
+  type ProbeAnswerOut,
   type SubmitOut,
 } from "../../../lib/api";
 import ProbeCard from "../../components/ProbeCard";
@@ -33,6 +34,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
   const [probe, setProbe] = useState<Probe | null>(null);
   const [probeResult, setProbeResult] = useState<"correct" | "incorrect" | null>(null);
   const [acquired, setAcquired] = useState(false);
+  const [schedule, setSchedule] = useState<ProbeAnswerOut | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
     setProbe(null);
     setProbeResult(null);
     setAcquired(false);
+    setSchedule(null);
     api
       .getLevel(nodeId, levelName)
       .then((lv) => {
@@ -107,6 +110,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
       });
       setProbeResult(out.probe_correct ? "correct" : "incorrect");
       setAcquired(out.acquired);
+      setSchedule(out);
     } catch (e) {
       setError(String(e));
     }
@@ -270,12 +274,31 @@ export default function NodeSession({ params }: { params: { id: string } }) {
           }}
         >
           <strong style={{ color: "#1a7f37" }}>
-            Node acquired ✓ (reproduce-without-AI terbukti)
+            {schedule?.became_mastered
+              ? "Node mastered 🎉 (reproduce-without-AI terbukti berulang & berjarak)"
+              : "Node acquired ✓ (reproduce-without-AI terbukti)"}
           </strong>
           <p style={{ margin: "6px 0 0", color: "#57606a" }}>
-            Status <code>acquired</code> — belum <code>mastered</code>. Mastery butuh
-            lolos berulang berjarak (FSRS, M4).
+            {schedule?.became_mastered ? (
+              <>
+                Sukses berjarak {schedule.consecutive_success}/{schedule.successes_needed} —
+                terpenuhi. Node tetap dijadwalkan; gagal di jatuh tempo mana pun
+                menurunkannya jadi <code>lapsed</code>.
+              </>
+            ) : (
+              <>
+                Status <code>acquired</code> — belum <code>mastered</code>. Mastery butuh{" "}
+                {schedule?.successes_needed ?? 4}× lolos <strong>berjarak</strong>; baru{" "}
+                {schedule?.consecutive_success ?? 1}.
+              </>
+            )}
           </p>
+          {schedule?.due_at && (
+            <p style={{ margin: "6px 0 0", color: "#57606a" }}>
+              Masuk jadwal review: ~{schedule.interval_days?.toFixed(1)} hari lagi (
+              {new Date(schedule.due_at).toLocaleDateString()}).
+            </p>
+          )}
           <Link href="/">← Kembali ke daftar node</Link>
         </div>
       )}

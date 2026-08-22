@@ -69,11 +69,16 @@ def _read(path: Path) -> str:
 
 def _rel_to_repo(path: Path) -> str:
     """Path relatif ke repo root untuk disimpan sebagai pointer. Fallback ke absolut
-    jika di luar repo (mis. folder tmp saat test)."""
+    jika di luar repo (mis. folder tmp saat test).
+
+    SELALU gaya POSIX (`/`): pointer ini masuk DB & di-diff lintas mesin, jadi ia
+    tak boleh berubah bentuk hanya karena OS penulisnya Windows. `Path` menerima
+    `/` di semua platform, jadi pembacaannya tetap benar.
+    """
     try:
-        return str(path.relative_to(REPO_ROOT))
+        return path.relative_to(REPO_ROOT).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def _load_yaml(path: Path) -> dict:
