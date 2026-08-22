@@ -3,7 +3,15 @@
 Semua angka "ajaib" dari PRD masuk di sini, jangan sebar di kode.
 """
 
+import os
 from pathlib import Path
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 # Root repo = dua tingkat di atas file ini (backend/app/config.py -> repo/).
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -58,3 +66,31 @@ EXECUTION_TIMEOUT_SECONDS = 10
 
 # Origin frontend Next.js untuk CORS (dev).
 FRONTEND_ORIGIN = "http://localhost:3000"
+
+# --------------------------------------------------------------------------- #
+# Integrasi Claude Code (M5) — AKSELERATOR, BUKAN FONDASI (PRD §10, RISK-3).
+# Semua di bawah ini boleh mati tanpa merusak loop M3/M4.
+# --------------------------------------------------------------------------- #
+# Direktori kerja output Claude Code. Claude Code menulis HANYA ke sini; promosi ke
+# `data/`/DB cuma lewat gate (skema + test + approve Isyah). Git-ignored.
+ARTIFACTS_DIR = REPO_ROOT / "artifacts"
+
+# Kill switch. Dimatikan → endpoint trigger balas 503 dan loop inti tak tersentuh.
+CLAUDE_INTEGRATION_ENABLED = _env_flag("CLAUDE_INTEGRATION_ENABLED", True)
+
+# Binary Claude Code headless. Tak ada di PATH → job `failed` dengan pesan jelas,
+# bukan exception yang merembet ke request UI.
+CLAUDE_CLI_PATH = os.environ.get("CLAUDE_CLI_PATH", "claude")
+
+# Batas satu panggilan Claude Code. Ini agent CLI (bisa lama), bukan HTTP call —
+# angkanya sengaja besar, dan pemanggilannya selalu di latar (job), tak pernah
+# memblokir request UI.
+CLAUDE_TIMEOUT_SECONDS = 900
+
+# Retry TERBATAS (format output tak konsisten = risiko utama RISK-3). Satu ulangan
+# saja: kalau dua kali gagal memenuhi kontrak, itu masalah prompt, bukan nasib.
+CLAUDE_MAX_RETRIES = 1
+
+# Batas panjang materi R3. Guardrail §8 (content library ditolak) yang bisa DIUJI:
+# materi just-in-time, bukan bab. Artifact lebih panjang dari ini ditolak skema.
+EXPLANATION_MAX_CHARS = 2500

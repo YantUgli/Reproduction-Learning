@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 
 from app.config import MIN_VARIANTS_FOR_REVIEW
 from app.graders.unit_test import reference_solution_path
-from app.models import Attempt, ChallengeInstance, Node
+from app.models import Attempt, ChallengeInstance, ComprehensionProbe, Node
 
 LEVELS = ["L3", "L2", "L1", "L0"]
 
@@ -102,6 +102,26 @@ def review_instance(session: Session, node_id: str) -> ReviewInstance:
         previous_instance_id=previous_id,
         needs_more_variants=len(rows) < MIN_VARIANTS_FOR_REVIEW,
     )
+
+
+def pick_probe(session: Session, node_id: str) -> ComprehensionProbe | None:
+    """Probe untuk satu attempt — BERGILIR bila node punya lebih dari satu.
+
+    Sebelum M5, kedua pemanggil memakai `.first()`, jadi probe kedua dan seterusnya
+    tak pernah tampil (probe hasil R4 akan jadi konten mati). Rotasi memakai jumlah
+    attempt node sebagai indeks: deterministik (bisa di-test), tapi tak menyodorkan
+    pertanyaan yang sama tiap kali node muncul lagi di review.
+    """
+    probes = sorted(
+        session.exec(
+            select(ComprehensionProbe).where(ComprehensionProbe.node_id == node_id)
+        ).all(),
+        key=lambda p: p.id,
+    )
+    if not probes:
+        return None
+    attempts = len(session.exec(select(Attempt).where(Attempt.node_id == node_id)).all())
+    return probes[attempts % len(probes)]
 
 
 def build_level_view(session: Session, node: Node, level: str) -> LevelView:

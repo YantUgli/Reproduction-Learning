@@ -17,6 +17,11 @@ out/
 npm-debug.log*
 yarn-error.log*
 
+# Output Claude Code (M5) — usulan runtime, bukan sumber kebenaran.
+# Yang di-commit adalah hasil promosinya di `data/` setelah lolos gate.
+artifacts/*
+!artifacts/README.md
+
 # OS junk
 .DS_Store
 Thumbs.db

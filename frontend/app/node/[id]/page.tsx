@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
+  type Explanation,
   type LevelView,
   type NodeDetail,
   type Probe,
@@ -36,6 +37,9 @@ export default function NodeSession({ params }: { params: { id: string } }) {
   const [probeResult, setProbeResult] = useState<"correct" | "incorrect" | null>(null);
   const [acquired, setAcquired] = useState(false);
   const [schedule, setSchedule] = useState<ProbeAnswerOut | null>(null);
+  // Materi just-in-time (R3, M5): hanya diminta SETELAH gagal, dan backend menolak
+  // (403) selama node ini belum punya attempt gagal. Bukan bab untuk dibaca dulu.
+  const [explanation, setExplanation] = useState<Explanation | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,6 +56,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
     setProbeResult(null);
     setAcquired(false);
     setSchedule(null);
+    setExplanation(null);
     api
       .getLevel(nodeId, levelName)
       .then((lv) => {
@@ -91,6 +96,9 @@ export default function NodeSession({ params }: { params: { id: string } }) {
         if (out.passed) {
           const p = await api.getProbe(nodeId).catch(() => null);
           setProbe(p);
+        } else {
+          // Baru sekarang materi boleh muncul: kegagalannya sudah terjadi.
+          setExplanation(await api.getExplanation(nodeId).catch(() => null));
         }
       } catch (e) {
         setError(String(e));
@@ -258,6 +266,39 @@ export default function NodeSession({ params }: { params: { id: string } }) {
                 </button>
               )}
             </div>
+          )}
+
+          {!grade.passed && explanation && (
+            <details style={{ marginTop: 12 }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+                Materi just-in-time untuk node ini
+              </summary>
+              <div
+                style={{
+                  background: "#f6f8fa",
+                  border: "1px solid #d0d7de",
+                  borderRadius: 8,
+                  padding: "0.5rem 1rem",
+                  marginTop: 8,
+                }}
+              >
+                <Markdown>{explanation.markdown}</Markdown>
+                {explanation.worked_example && (
+                  <pre
+                    style={{
+                      background: "#0d1117",
+                      color: "#e6edf3",
+                      padding: "0.75rem 1rem",
+                      borderRadius: 8,
+                      overflowX: "auto",
+                      fontSize: 13,
+                    }}
+                  >
+                    {explanation.worked_example}
+                  </pre>
+                )}
+              </div>
+            </details>
           )}
         </div>
       )}

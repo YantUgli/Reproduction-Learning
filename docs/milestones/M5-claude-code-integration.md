@@ -137,10 +137,26 @@ ditolak otomatis; test hijau → masuk review. Trigger R2 → hipotesis masuk se
 
 ## Acceptance criteria
 
-- [ ] R3, R4, R2 terintegrasi async via file artifact (bukan HTTP sinkron).
-- [ ] `contracts.py` menolak artifact yang tak sesuai skema sebelum review.
-- [ ] Gate R4 otomatis menolak soal yang hidden test-nya merah di solusi referensi.
-- [ ] `SkillHypothesis` dari R2 masuk `unverified` dan **tidak pernah** jadi verdict.
-- [ ] Review Isyah wajib untuk R4 (dan R2/R3 sesuai keputusan tercatat).
-- [ ] Mematikan integrasi Claude Code tidak merusak loop M3/M4.
-- [ ] Tidak ada jalur di mana AI menetapkan edge final, mastery, atau menilai teks bebas.
+- [x] R3, R4, R2 terintegrasi async via file artifact (bukan HTTP sinkron).
+      `claude -p` dipanggil dengan cwd = direktori job; router hanya membuat job
+      (`202 pending`) dan menyerahkannya ke `BackgroundTasks`. Ketiganya sudah
+      dijalankan **melawan CLI sungguhan**, bukan cuma runner palsu.
+- [x] `contracts.py` menolak artifact yang tak sesuai skema sebelum review.
+      — `tests/test_claude_contracts.py` (22 test: sitasi tak dikenal, materi
+      kepanjangan, probe tanpa jawaban di options, test tak meng-import `solution`,
+      confidence di luar 0..1, artifact yang membawa field `status`).
+- [x] Gate R4 otomatis menolak soal yang hidden test-nya merah di solusi referensi —
+      **plus** soal yang `starter_code`-nya sudah lolos (tantangan kosong).
+      — `tests/test_review_gate.py`.
+- [x] `SkillHypothesis` dari R2 masuk `unverified` dan **tidak pernah** jadi verdict.
+      Hanya attempt mode `verification`/`review`/`placement` yang mengubahnya;
+      attempt berscaffold (`acquisition`) tidak dihitung sebagai bukti.
+- [x] Review Isyah wajib untuk **ketiga** peran (keputusan tercatat di CLAUDE.md §7:
+      R3 tidak auto-approve, karena "sitasi terverifikasi" yang bisa dicek mesin
+      hanyalah *keberadaan* source_ref, bukan *kebenaran* klaimnya).
+- [x] Mematikan integrasi Claude Code tidak merusak loop M3/M4.
+      `CLAUDE_INTEGRATION_ENABLED=0` → trigger balas 503; test membuktikan submit
+      attempt tetap jalan setelah kill switch & setelah job gagal total.
+- [x] Tidak ada jalur di mana AI menetapkan edge final, mastery, atau menilai teks
+      bebas. `edges.yaml` tak pernah ditulis kode M5; promosi R4 memakai validasi M2
+      yang sama dengan node tulisan tangan; probe tetap `correct_answer` deterministik.

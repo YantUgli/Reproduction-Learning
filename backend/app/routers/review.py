@@ -17,10 +17,10 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.db import get_session
-from app.models import ComprehensionProbe, Node, ScheduleItem
+from app.models import Node, ScheduleItem
 from app.services.attempt_service import submit_attempt
 from app.services.mastery import IN_SCHEDULE, Outcome, apply_outcome
-from app.services.scaffold import review_instance
+from app.services.scaffold import pick_probe, review_instance
 from app.services.scheduler import as_utc, utcnow
 
 router = APIRouter(prefix="/review", tags=["review"])
@@ -222,9 +222,7 @@ def submit_review(body: ReviewSubmitIn, session: Session = Depends(get_session))
             outcome=OutcomeOut.of(outcome),
         )
 
-    probe = session.exec(
-        select(ComprehensionProbe).where(ComprehensionProbe.node_id == body.node_id)
-    ).first()
+    probe = pick_probe(session, body.node_id)
     if probe is None:
         # Node tanpa probe (seharusnya ditolak M2) — terapkan hasil apa adanya.
         outcome = apply_outcome(session, node_id=body.node_id, test_passed=True, probe_correct=None)

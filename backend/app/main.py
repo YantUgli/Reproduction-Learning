@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import FRONTEND_ORIGIN
 from app.db import init_db
-from app.routers import attempts, nodes, placement, probes, review, stats
+from app.routers import attempts, authoring, nodes, placement, probes, review, stats
 
 
 @asynccontextmanager
@@ -37,6 +37,9 @@ app.include_router(probes.router)
 app.include_router(placement.router)
 app.include_router(review.router)
 app.include_router(stats.router)
+# M5 — integrasi Claude Code. Router ini boleh mati (kill switch) tanpa mengubah
+# apa pun di router di atasnya.
+app.include_router(authoring.router)
 
 
 @app.get("/health")

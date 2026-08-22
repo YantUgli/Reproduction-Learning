@@ -174,6 +174,68 @@ export interface PlacementSubmitOut {
   unlocked: string[];
 }
 
+// --- M5: integrasi Claude Code (async via artifact + review Isyah) ---
+export type JobRole = "r2" | "r3" | "r4";
+export type JobStatus =
+  | "pending"
+  | "running"
+  | "ready"
+  | "failed"
+  | "approved"
+  | "rejected";
+
+export interface IntegrationStatus {
+  enabled: boolean;
+  cli_available: boolean;
+  counts: Record<string, number>;
+  never_does: string[];
+}
+
+export interface AuthoringJob {
+  id: string;
+  role: JobRole;
+  status: JobStatus;
+  created_at: string;
+  updated_at: string;
+  prompt_version: string;
+  request: Record<string, unknown>;
+  summary: Record<string, unknown>;
+  gate: { passed: boolean; reason: string; output?: string } | null;
+  error: string;
+  attempts: number;
+}
+
+export interface AuthoringJobDetail extends AuthoringJob {
+  prompt: string;
+  files: Record<string, string>;
+  existing: Record<string, string>;
+}
+
+export interface ApproveOut {
+  job_id: string;
+  role: JobRole;
+  node_id: string;
+  written_paths: string[];
+  db_effect: Record<string, unknown>;
+}
+
+export interface Hypothesis {
+  id: number;
+  node_id: string;
+  source: string;
+  confidence: number;
+  rationale: string;
+  evidence_locator: string;
+  status: "unverified" | "confirmed_by_attempt" | "refuted_by_attempt";
+  created_at: string;
+}
+
+export interface Explanation {
+  node_id: string;
+  markdown: string;
+  worked_example: string;
+}
+
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.text();
@@ -246,4 +308,53 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then(j<PlacementSubmitOut>),
+
+  // --- M5 ---
+  // Materi just-in-time: backend menolak (403) selama node belum punya attempt gagal.
+  getExplanation: (nodeId: string) =>
+    fetch(`${BACKEND_URL}/nodes/${nodeId}/explanation`).then(j<Explanation>),
+
+  getIntegrationStatus: () =>
+    fetch(`${BACKEND_URL}/authoring/status`).then(j<IntegrationStatus>),
+  listJobs: (params?: { role?: JobRole; status?: JobStatus }) => {
+    const q = new URLSearchParams();
+    if (params?.role) q.set("role", params.role);
+    if (params?.status) q.set("status", params.status);
+    const suffix = q.toString() ? `?${q}` : "";
+    return fetch(`${BACKEND_URL}/authoring/jobs${suffix}`).then(j<AuthoringJob[]>);
+  },
+  getJob: (jobId: string) =>
+    fetch(`${BACKEND_URL}/authoring/jobs/${jobId}`).then(j<AuthoringJobDetail>),
+  triggerR3: (body: { node_id: string; attempt_id?: number }) =>
+    fetch(`${BACKEND_URL}/authoring/r3`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(j<AuthoringJob>),
+  triggerR4: (body: { node_id: string; variant_label?: string }) =>
+    fetch(`${BACKEND_URL}/authoring/r4`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(j<AuthoringJob>),
+  triggerR2: (body: { repo_path: string; node_ids?: string[] }) =>
+    fetch(`${BACKEND_URL}/authoring/r2`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(j<AuthoringJob>),
+  approveJob: (jobId: string) =>
+    fetch(`${BACKEND_URL}/authoring/jobs/${jobId}/approve`, { method: "POST" }).then(
+      j<ApproveOut>,
+    ),
+  rejectJob: (jobId: string, reason: string) =>
+    fetch(`${BACKEND_URL}/authoring/jobs/${jobId}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    }).then(j<AuthoringJob>),
+  listHypotheses: (nodeId?: string) =>
+    fetch(`${BACKEND_URL}/authoring/hypotheses${nodeId ? `?node_id=${nodeId}` : ""}`).then(
+      j<Hypothesis[]>,
+    ),
 };

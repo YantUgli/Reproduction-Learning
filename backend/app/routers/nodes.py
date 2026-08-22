@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from app.config import DATA_DIR
 from app.db import get_session
-from app.models import ComprehensionProbe, Node
+from app.models import Attempt, Node
 from app.services.progress import all_statuses, effective_status
-from app.services.scaffold import LEVELS, build_level_view
+from app.services.scaffold import LEVELS, build_level_view, pick_probe
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -40,6 +41,12 @@ class LevelViewOut(BaseModel):
     editable: bool
     show_timebox: bool
     timebox_seconds: int
+
+
+class ExplanationOut(BaseModel):
+    node_id: str
+    markdown: str
+    worked_example: str
 
 
 class ProbeOut(BaseModel):
@@ -101,11 +108,42 @@ def get_level(
     return LevelViewOut(**view.__dict__)
 
 
+@router.get("/{node_id}/explanation", response_model=ExplanationOut)
+def get_explanation(node_id: str, session: Session = Depends(get_session)) -> ExplanationOut:
+    """Materi just-in-time (R3, M5) — HANYA setelah kegagalan nyata.
+
+    Gerbang "harus ada attempt gagal" ada di server, bukan cuma di UI: tanpa itu
+    `explanation.md` berubah jadi bab bacaan yang bisa dilahap sebelum mencoba —
+    persis content library yang ditolak §8.
+    """
+    node = session.get(Node, node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="node not found")
+
+    failed = session.exec(
+        select(Attempt).where(Attempt.node_id == node_id, Attempt.result == "fail")
+    ).first()
+    if failed is None:
+        raise HTTPException(
+            status_code=403,
+            detail="materi just-in-time baru terbuka setelah attempt yang gagal",
+        )
+
+    node_dir = DATA_DIR / "domains" / node.domain_id / "nodes" / node_id
+    explanation = node_dir / "explanation.md"
+    worked = node_dir / "worked_example.py"
+    if not explanation.exists():
+        raise HTTPException(status_code=404, detail="node ini belum punya materi just-in-time")
+    return ExplanationOut(
+        node_id=node_id,
+        markdown=explanation.read_text(encoding="utf-8"),
+        worked_example=worked.read_text(encoding="utf-8") if worked.exists() else "",
+    )
+
+
 @router.get("/{node_id}/probe", response_model=ProbeOut)
 def get_probe(node_id: str, session: Session = Depends(get_session)) -> ProbeOut:
-    probe = session.exec(
-        select(ComprehensionProbe).where(ComprehensionProbe.node_id == node_id)
-    ).first()
+    probe = pick_probe(session, node_id)
     if probe is None:
         raise HTTPException(status_code=404, detail="probe not found for node")
     return ProbeOut(

@@ -98,7 +98,11 @@ function DueSection({ due }: { due: DueItem[] }) {
     <section style={{ marginTop: 24 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <h2 style={{ fontSize: 18 }}>Review jatuh tempo hari ini</h2>
-        <Link href="/placement">Jalankan placement →</Link>
+        <span style={{ display: "flex", gap: 14 }}>
+          <Link href="/placement">Jalankan placement →</Link>
+          {/* Meja kerja Isyah (M5), bukan jalur belajar Bryant. */}
+          <Link href="/authoring">Review authoring →</Link>
+        </span>
       </div>
 
       {due.length === 0 ? (

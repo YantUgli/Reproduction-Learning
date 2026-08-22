@@ -138,6 +138,18 @@ cd frontend && npm run dev
 
 Halaman frontend (M4): `/` dashboard + KPI · `/node/[id]` sesi akuisisi L3→L0 ·
 `/placement` menemukan lantai · `/review` sesi review jatuh tempo.
+Halaman M5: `/authoring` meja review Isyah (antrean artifact Claude Code).
+
+```bash
+# Integrasi Claude Code (M5) — semuanya opsional bagi loop inti.
+CLAUDE_INTEGRATION_ENABLED=0 uvicorn app.main:app --reload   # kill switch: trigger balas 503
+```
+
+Alur M5 satu artifact: `POST /authoring/{r2,r3,r4}` (balas `202`, job `pending`) →
+Claude Code jalan di latar & menulis ke `artifacts/<role>/<stamp>/` → skema
+(`contracts.py`) → gate otomatis R4 (eksekusi test) → `ready` → **Isyah approve di
+`/authoring`** → promosi ke `data/`/DB. Tanpa approve, tak ada yang masuk sistem.
+`artifacts/` git-ignored; yang di-commit adalah hasil promosinya di `data/`.
 
 ---
 
@@ -276,3 +288,51 @@ alasan · alternatif yang ditolak.
   pernah tampil — menulisnya = konten mati yang tetap harus di-review. Urutan `options`
   juga sengaja divariasikan posisinya (UI `ProbeCard` merender apa adanya, tanpa
   pengacakan); jawaban benar yang selalu di posisi 1 melatih posisi, bukan konsep.
+  *(Dicabut sebagian di M5: pemilihan probe kini bergilir — lihat entri `pick_probe`.)*
+
+- **2026-08-22 · M5 · State job Claude Code hidup di FILE (`artifacts/<role>/<stamp>/job.json`),
+  bukan tabel DB.** Artifact-lah sumber kebenaran integrasi (PRD §10 "async lewat file"),
+  jadi menyalin statusnya ke DB berarti dua sumber yang bisa berbeda. Efek samping yang
+  diinginkan: loop inti tak punya ketergantungan skema pada M5 — matikan integrasi, tak
+  ada tabel yatim; hapus satu folder, hilang satu usulan. *Ditolak:* tabel `AuthoringJob`
+  (query lebih enak, tapi menambah migrasi & bikin kill switch tak lagi bersih).
+
+- **2026-08-22 · M5 · Approve Isyah WAJIB untuk ketiga peran — R3 tidak auto-approve.**
+  M5 langkah 4 membuka kemungkinan "R3 auto dengan sitasi terverifikasi"; ditolak karena
+  yang bisa diverifikasi mesin hanyalah bahwa `source_ref_id` ADA di `sources.yaml` —
+  bukan bahwa klaimnya benar-benar ditopang sumber itu. Auto-approve atas dasar
+  pemeriksaan yang lebih lemah dari namanya justru pintu masuk materi salah yang
+  terlihat bersitasi. Konsekuensi yang diterima: materi baru muncul setelah Isyah
+  meninjau, jadi kegagalan pertama Bryant mungkin belum berpendamping materi.
+
+- **2026-08-22 · M5 · Materi R3 digerbangi server: `GET /nodes/{id}/explanation` balas 403
+  selama node belum punya attempt GAGAL.** Kalau gerbangnya cuma di UI, `explanation.md`
+  berubah jadi bab bacaan yang bisa dilahap sebelum mencoba — content library yang
+  ditolak §8, lewat pintu belakang. Materi lahir dari kegagalan nyata atau tidak sama
+  sekali. Trigger R3 pun menolak node tanpa attempt gagal.
+
+- **2026-08-22 · M5 · Gate otomatis R4 punya DUA pemeriksaan, bukan satu.** Selain
+  "hidden test hijau di `reference_solution`" (aturan §10 R4), soal juga ditolak bila
+  `starter_code` SUDAH lolos hidden test — kerangka yang lolos berarti tantangannya
+  kosong dan kelulusannya tak membuktikan apa pun. Keduanya eksekusi kode, keduanya
+  jalan sebelum artifact sampai ke manusia.
+
+- **2026-08-22 · M5 · `hypotheses.json` dengan daftar KOSONG adalah artifact yang SAH
+  (+ field `note`).** Ditemukan saat uji CLI sungguhan: model yang tak bisa membaca repo
+  menulis daftar kosong + penjelasan, dan skema lama menolaknya sebagai error. Itu salah
+  arah — menolak "tak ada bukti" berarti menekan model mengarang hipotesis demi memuaskan
+  skema, persis kegagalan termahal di peran ini (RISK-4). Sekarang kosong = `ready` dengan
+  0 baris; alasannya tampil apa adanya ke Isyah. R3/R4 tetap wajib berisi.
+
+- **2026-08-22 · M5 · Pemilihan probe BERGILIR (`services/scaffold.pick_probe`), tidak lagi
+  `.first()`.** Begitu R4 bisa mengarang probe baru, `.first()` membuat setiap probe kedua
+  jadi konten mati yang tetap memakan waktu review. Rotasi memakai jumlah attempt node
+  sebagai indeks: deterministik (bisa di-test), tapi tak menyodorkan pertanyaan yang sama
+  tiap node muncul lagi. *Ditolak:* acak (tak bisa di-test & tak bisa direproduksi).
+
+- **2026-08-22 · M5 · R2 mendapat akses baca repo lewat `--add-dir`, bukan lewat cwd.**
+  cwd proses Claude Code selalu direktori job — supaya satu-satunya tempat ia bisa
+  menulis adalah `artifacts/`. Repo Bryant ditambahkan terpisah sebagai direktori yang
+  boleh DIBACA. Argv lengkap disimpan ke `command.log` tiap job: saat artifact-nya aneh,
+  pertanyaan pertama selalu "dipanggil dengan flag apa", dan menebaknya belakangan mahal
+  (biaya ini sudah dibayar sekali saat verifikasi).

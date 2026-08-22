@@ -5,6 +5,9 @@ INVARIANT:
 - SETIAP attempt disimpan, termasuk gagal & lewat-timebox — itu data sinyal inti
   (`reproduce-without-AI pass rate`, §9 KPI).
 - `acquired` di-set HANYA saat `result=pass` DAN probe benar.
+- M5: attempt juga mengonfirmasi/membantah `SkillHypothesis` (R2) — satu-satunya
+  jalan hipotesis Claude Code berubah status. Arahnya searah: eksekusi memutuskan
+  nasib hipotesis, hipotesis tak pernah memutuskan apa pun.
 
 M4: transisi status & penjadwalan TIDAK lagi dikerjakan di sini — semuanya lewat
 `services/mastery.apply_outcome`, supaya jalur akuisisi (L0 + probe), review harian,
@@ -17,6 +20,7 @@ from sqlmodel import Session, select
 
 from app.graders import GradeResult, get_grader
 from app.models import Attempt, ChallengeInstance, ComprehensionProbe, Node
+from app.services.hypotheses import apply_attempt
 from app.services.mastery import Outcome, apply_outcome, ensure_schedule_item
 
 __all__ = [
@@ -85,6 +89,11 @@ def submit_attempt(
     ensure_schedule_item(session, node)
     session.commit()
     session.refresh(attempt)
+
+    # M5: eksekusi kode adalah SATU-SATUNYA yang boleh memutuskan nasib hipotesis
+    # Claude Code (R2). Ini pembukuan murni — tak menyentuh status/jadwal node.
+    apply_attempt(session, attempt)
+
     return SubmitResult(attempt=attempt, grade=grade)
 
 
