@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — SATU sumber kebenaran warna (dibaca tailwind.config.ts).
+ * Light mode dulu. Dark mode nanti = tambah blok `.dark { ... }` di bawah + toggle
+ * class di <html>; tak ada komponen yang perlu diubah karena semua memakai token.
+ * Palet = GitHub Primer yang sudah dipakai sejak M3.
+ */
+:root {
+  --canvas: #f6f8fa;
+  --surface: #ffffff;
+  --surface-muted: #f6f8fa;
+  --border: #d0d7de;
+  --border-muted: #e6eaef;
+
+  --fg: #1f2328;
+  --muted: #57606a;
+  /* --subtle dinaikkan dari #8c959f (kontras 2.85 — GAGAL WCAG AA) ke #656d76,
+   * yang lulus AA (≥4.5) di canvas, surface, maupun neutral-bg. */
+  --subtle: #656d76;
+  /* Warna teks untuk elemen dinonaktifkan/terkunci. Menggantikan pola `opacity-70`
+   * yang meredam token & membuat kontras tak bisa diaudit (temuan aksesibilitas). */
+  --fg-disabled: #656d76;
+
+  --accent: #0969da;
+  --accent-hover: #0860ca;
+  --accent-fg: #ffffff;
+
+  --neutral: #57606a;
+  --neutral-bg: #eaeef2;
+  --success: #1a7f37;
+  --success-bg: #dafbe1;
+  --danger: #cf222e;
+  --danger-bg: #ffebe9;
+  --warning: #9a6700;
+  --warning-bg: #fff8c5;
+  --info: #0969da;
+  --info-bg: #ddf4ff;
+
+  /* Terminal / blok kode & output test */
+  --code-bg: #0d1117;
+  --code-fg: #e6edf3;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Fokus keyboard yang konsisten & terlihat (aksesibilitas) tanpa mengganggu klik mouse. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

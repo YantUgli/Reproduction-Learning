@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
  *   baris kosong   → pemisah blok (paragraf)
  */
 export default function Markdown({ children }: { children: string }) {
-  return <div style={{ lineHeight: 1.55 }}>{renderBlocks(children ?? "")}</div>;
+  return <div className="text-[15px] leading-relaxed text-fg">{renderBlocks(children ?? "")}</div>;
 }
 
 function renderBlocks(src: string): ReactNode[] {
@@ -48,14 +48,7 @@ function renderBlocks(src: string): ReactNode[] {
       blocks.push(
         <pre
           key={key++}
-          style={{
-            background: "#0d1117",
-            color: "#e6edf3",
-            padding: "0.75rem 1rem",
-            borderRadius: 8,
-            overflowX: "auto",
-            fontSize: 13,
-          }}
+          className="my-2 overflow-x-auto rounded-md bg-code-bg p-4 text-13 text-code-fg"
         >
           {buf.join("\n")}
         </pre>,
@@ -67,9 +60,11 @@ function renderBlocks(src: string): ReactNode[] {
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) {
       const depth = heading[1].length;
-      const Tag = `h${Math.min(depth + 1, 6)}` as "h2" | "h3" | "h4" | "h5" | "h6";
+      // Offset +2: `#` prompt jadi <h3>, tidak bersaing dengan <h2> judul level di
+      // halaman (menjaga urutan heading H1→H2→H3, bukan H2 ganda).
+      const Tag = `h${Math.min(depth + 2, 6)}` as "h3" | "h4" | "h5" | "h6";
       blocks.push(
-        <Tag key={key++} style={{ margin: "0.6rem 0 0.3rem", lineHeight: 1.3 }}>
+        <Tag key={key++} className="mb-1 mt-3 text-lg font-semibold leading-snug first:mt-0">
           {renderInline(heading[2])}
         </Tag>,
       );
@@ -81,12 +76,25 @@ function renderBlocks(src: string): ReactNode[] {
     if (/^\s*[-*]\s+/.test(line)) {
       const items: ReactNode[] = [];
       while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
-        const text = lines[i].replace(/^\s*[-*]\s+/, "");
-        items.push(<li key={items.length}>{renderInline(text)}</li>);
+        const parts = [lines[i].replace(/^\s*[-*]\s+/, "")];
         i++;
+        // Lazy continuation: baris berikutnya yang BUKAN butir/heading/fence/kosong
+        // adalah lanjutan butir ini. Tanpa ini, syarat soal yang membungkus ke baris
+        // baru terlepas dari bulletnya (merusak teks spesifikasi tugas).
+        while (
+          i < lines.length &&
+          lines[i].trim() !== "" &&
+          !/^\s*[-*]\s+/.test(lines[i]) &&
+          !/^#{1,6}\s+/.test(lines[i]) &&
+          !lines[i].trim().startsWith("```")
+        ) {
+          parts.push(lines[i].trim());
+          i++;
+        }
+        items.push(<li key={items.length}>{renderInline(parts.join(" "))}</li>);
       }
       blocks.push(
-        <ul key={key++} style={{ margin: "0.4rem 0", paddingLeft: "1.4rem" }}>
+        <ul key={key++} className="my-2 list-disc space-y-1 pl-6">
           {items}
         </ul>,
       );
@@ -106,7 +114,7 @@ function renderBlocks(src: string): ReactNode[] {
       i++;
     }
     blocks.push(
-      <p key={key++} style={{ margin: "0.4rem 0" }}>
+      <p key={key++} className="my-2 first:mt-0 last:mb-0">
         {renderInline(para.join(" "))}
       </p>,
     );
@@ -126,13 +134,7 @@ function renderInline(text: string): ReactNode[] {
       out.push(
         <code
           key={key++}
-          style={{
-            background: "#eff1f3",
-            borderRadius: 4,
-            padding: "0.1em 0.35em",
-            fontSize: "0.9em",
-            fontFamily: "monospace",
-          }}
+          className="rounded bg-neutral-bg px-1.5 py-0.5 font-mono text-[0.9em]"
         >
           {part.slice(1, -1)}
         </code>,
@@ -143,7 +145,11 @@ function renderInline(text: string): ReactNode[] {
     const bold = part.split(/(\*\*[^*]+\*\*)/g);
     for (const seg of bold) {
       if (seg.startsWith("**") && seg.endsWith("**") && seg.length >= 4) {
-        out.push(<strong key={key++}>{seg.slice(2, -2)}</strong>);
+        out.push(
+          <strong key={key++} className="font-semibold">
+            {seg.slice(2, -2)}
+          </strong>,
+        );
       } else if (seg) {
         out.push(<span key={key++}>{seg}</span>);
       }

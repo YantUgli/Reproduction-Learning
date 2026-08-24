@@ -1,6 +1,8 @@
+import "./globals.css";
+
 export const metadata = {
   title: "Reproduction Learning Engine",
-  description: "M0 scaffolding",
+  description: "Ukuran belajar: reproduce-without-AI",
 };
 
 export default function RootLayout({
@@ -10,13 +12,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body
-        style={{
-          fontFamily: "system-ui, sans-serif",
-          margin: 0,
-          padding: "2rem",
-        }}
-      >
+      <body className="min-h-screen bg-canvas px-4 py-8 text-fg antialiased sm:px-8">
         {children}
       </body>
     </html>

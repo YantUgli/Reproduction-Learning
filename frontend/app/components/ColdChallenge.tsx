@@ -4,10 +4,11 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Markdown from "./Markdown";
 import Timebox from "./Timebox";
+import Button from "./ui/Button";
 
 const SandboxEditor = dynamic(() => import("./SandboxEditor"), {
   ssr: false,
-  loading: () => <p>Memuat editor…</p>,
+  loading: () => <p className="text-muted">Memuat editor…</p>,
 });
 
 /**
@@ -23,6 +24,7 @@ export default function ColdChallenge({
   timeboxSeconds,
   submitting,
   submitLabel = "Jalankan & Verifikasi",
+  language = "plaintext",
   onSubmit,
 }: {
   /** Berubah saat tantangan berganti → editor & timebox direset. */
@@ -32,6 +34,7 @@ export default function ColdChallenge({
   timeboxSeconds: number;
   submitting: boolean;
   submitLabel?: string;
+  language?: string;
   onSubmit: (code: string, durationSeconds: number, timeboxExceeded: boolean) => void;
 }) {
   const [code, setCode] = useState("");
@@ -53,8 +56,11 @@ export default function ColdChallenge({
   );
 
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+    <div className="mt-4">
+      <div className="mb-2 flex items-center justify-end gap-2">
+        <span className="text-13 text-muted">
+          Saat waktu habis, kode otomatis dikirim &amp; dinilai.
+        </span>
         <Timebox
           key={challengeKey}
           seconds={timeboxSeconds}
@@ -63,36 +69,31 @@ export default function ColdChallenge({
         />
       </div>
 
-      <div
-        style={{
-          background: "#f6f8fa",
-          border: "1px solid #d0d7de",
-          borderRadius: 8,
-          padding: "0.5rem 1rem",
-        }}
-      >
+      <div className="rounded-md border border-border bg-surface-muted px-4 py-3">
         <Markdown>{prompt}</Markdown>
       </div>
 
       {signatureContract && (
-        <p style={{ fontFamily: "monospace", fontSize: 13, color: "#57606a" }}>
+        <p className="mt-2 font-mono text-13 text-muted">
           contract: {signatureContract}
         </p>
       )}
 
-      <div style={{ margin: "1rem 0" }}>
+      <div className="my-4">
         <SandboxEditor
           value={code}
+          language={language}
           onChange={(v) => {
             setCode(v);
             codeRef.current = v;
           }}
+          onSubmit={submitting ? undefined : () => submit(false)}
         />
       </div>
 
-      <button onClick={() => submit(false)} disabled={submitting}>
+      <Button variant="primary" onClick={() => submit(false)} loading={submitting}>
         {submitting ? "Menjalankan…" : submitLabel}
-      </button>
-    </>
+      </Button>
+    </div>
   );
 }

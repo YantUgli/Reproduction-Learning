@@ -15,6 +15,11 @@ import ColdChallenge from "../components/ColdChallenge";
 import ProbeCard from "../components/ProbeCard";
 import StatusBadge from "../components/StatusBadge";
 import TestOutput from "../components/TestOutput";
+import Container from "../components/ui/Container";
+import Card from "../components/ui/Card";
+import EmptyState from "../components/ui/EmptyState";
+import ErrorState from "../components/ui/ErrorState";
+import { IconCheck, IconInbox } from "../components/ui/Icon";
 
 /**
  * Sesi review harian (M4).
@@ -25,7 +30,7 @@ import TestOutput from "../components/TestOutput";
  */
 export default function ReviewPage() {
   return (
-    <Suspense fallback={<Shell><p>Memuat…</p></Shell>}>
+    <Suspense fallback={<Shell><p className="text-muted">Memuat…</p></Shell>}>
       <ReviewSession />
     </Suspense>
   );
@@ -101,7 +106,7 @@ function ReviewSession() {
   if (error) {
     return (
       <Shell>
-        <p style={{ color: "#cf222e" }}>Error: {error}</p>
+        <ErrorState error={error} onRetry={() => location.reload()} />
       </Shell>
     );
   }
@@ -109,27 +114,32 @@ function ReviewSession() {
   if (!nodeId) {
     return (
       <Shell>
-        <h1>Review harian</h1>
-        {!due && <p>Memuat…</p>}
+        <h1 className="text-2xl font-bold tracking-tight">Review harian</h1>
+        {!due && <p className="mt-3 text-muted">Memuat…</p>}
         {due?.length === 0 && (
-          <p style={{ color: "#57606a" }}>
-            Tak ada node yang jatuh tempo. Spaced repetition cuma bekerja kalau
-            jaraknya dihormati — kembali lagi nanti.
-          </p>
+          <div className="mt-4">
+            <EmptyState icon={<IconInbox />} title="Tak ada node yang jatuh tempo">
+              Spaced repetition cuma bekerja kalau jaraknya dihormati — kembali lagi nanti.
+            </EmptyState>
+          </div>
         )}
-        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 8 }}>
-          {due?.map((d) => (
-            <li key={d.node_id}>
-              <button
-                onClick={() => setNodeId(d.node_id)}
-                style={{ width: "100%", textAlign: "left", padding: "0.7rem 1rem" }}
-              >
-                <strong>{d.concept}</strong> · telat {d.overdue_days.toFixed(1)} hari ·
-                sukses berjarak {d.consecutive_success}/{d.successes_needed}
-              </button>
-            </li>
-          ))}
-        </ul>
+        {due && due.length > 0 && (
+          <ul className="mt-4 grid gap-2">
+            {due.map((d) => (
+              <li key={d.node_id}>
+                <button onClick={() => setNodeId(d.node_id)} className="w-full text-left">
+                  <Card className="p-3.5 transition-shadow hover:shadow-md">
+                    <div className="font-semibold">{d.concept}</div>
+                    <div className="text-13 text-muted">
+                      telat {d.overdue_days.toFixed(1)} hari · sukses berjarak{" "}
+                      {d.consecutive_success}/{d.successes_needed}
+                    </div>
+                  </Card>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </Shell>
     );
   }
@@ -137,24 +147,24 @@ function ReviewSession() {
   if (!challenge) {
     return (
       <Shell>
-        <p>Memuat…</p>
+        <p className="text-muted">Memuat…</p>
       </Shell>
     );
   }
 
   return (
     <Shell>
-      <h1 style={{ marginBottom: 0 }}>{challenge.concept}</h1>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#57606a" }}>
+      <h1 className="text-2xl font-bold tracking-tight">{challenge.concept}</h1>
+      <div className="mt-0.5 font-mono text-xs text-subtle">
         review · {challenge.node_id} · varian {challenge.variant_label}
       </div>
-      <p style={{ color: "#57606a" }}>
-        Instance ini <strong>berbeda</strong> dari yang terakhir kamu kerjakan. Tanpa
-        contoh, tanpa kerangka, tanpa AI — produksi dari nol.
+      <p className="mt-2 text-muted">
+        Instance ini <strong className="font-semibold text-fg">berbeda</strong> dari yang
+        terakhir kamu kerjakan. Tanpa contoh, tanpa kerangka, tanpa AI — produksi dari nol.
       </p>
       {challenge.needs_more_variants && (
-        <p style={{ fontSize: 13, color: "#9a6700" }}>
-          ⚠ Varian node ini menipis — rotasi akan mulai berulang. Itu sinyal untuk
+        <p className="mt-2 rounded-md border border-warning bg-warning-bg px-4 py-2.5 text-13 text-warning">
+          Varian node ini menipis — rotasi akan mulai berulang. Itu sinyal untuk
           mengarang varian baru (authoring), bukan alasan berhenti review.
         </p>
       )}
@@ -166,6 +176,7 @@ function ReviewSession() {
           signatureContract={challenge.signature_contract}
           timeboxSeconds={challenge.timebox_seconds}
           submitting={submitting}
+          language={challenge.language}
           onSubmit={submit}
         />
       )}
@@ -175,7 +186,7 @@ function ReviewSession() {
       )}
 
       {grade?.passed && probe && !outcome && (
-        <div style={{ marginTop: 16 }}>
+        <div className="mt-4">
           <ProbeCard probe={probe} disabled={false} outcome={probeResult} onSubmit={answerProbe} />
         </div>
       )}
@@ -189,48 +200,50 @@ function OutcomePanel({ outcome }: { outcome: Outcome }) {
   const bad = outcome.became_lapsed;
   return (
     <div
-      style={{
-        marginTop: 16,
-        padding: "1rem 1.25rem",
-        background: bad ? "#ffebe9" : "#dafbe1",
-        border: `1px solid ${bad ? "#cf222e" : "#1a7f37"}`,
-        borderRadius: 8,
-      }}
+      className={`mt-4 rounded-md border px-5 py-4 ${
+        bad ? "border-danger bg-danger-bg" : "border-success bg-success-bg"
+      }`}
     >
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+      <div className="flex flex-wrap items-center gap-2.5">
         <StatusBadge status={outcome.status} />
-        {outcome.became_mastered && <strong style={{ color: "#9a6700" }}>MASTERED 🎉</strong>}
+        {outcome.became_mastered && (
+          <strong className="inline-flex items-center gap-1.5 text-warning">
+            <IconCheck size={15} /> MASTERED
+          </strong>
+        )}
         {outcome.became_lapsed && (
-          <strong style={{ color: "#cf222e" }}>Lapsed — interval direset</strong>
+          <strong className="text-danger">Lapsed — interval direset</strong>
         )}
       </div>
-      <p style={{ margin: "8px 0 0", color: "#57606a" }}>
-        Rating FSRS: <code>{outcome.rating}</code>
+      <p className="mt-2 text-13 text-muted">
+        Rating FSRS: <code className="font-mono">{outcome.rating}</code>
         {outcome.interval_days !== null && (
           <> · jadwal berikutnya ~{outcome.interval_days.toFixed(1)} hari lagi</>
         )}
         {outcome.due_at && <> ({new Date(outcome.due_at).toLocaleDateString()})</>}
       </p>
-      <p style={{ margin: "4px 0 8px", color: "#57606a" }}>
+      <p className="mt-1 text-13 text-muted">
         Sukses berjarak {outcome.consecutive_success}/{outcome.successes_needed} menuju{" "}
-        <code>mastered</code>
+        <code className="font-mono">mastered</code>
         {!outcome.spaced && " · attempt ini belum jatuh tempo, jadi tidak dihitung"}
         {!outcome.clean &&
           outcome.rating === "Hard" &&
           " · probe salah: produksi terbukti, pemahaman masih rapuh"}
       </p>
-      <Link href="/">← Kembali ke dashboard</Link>
+      <Link href="/" className="mt-2 inline-block text-sm text-accent hover:underline">
+        ← Kembali ke dashboard
+      </Link>
     </div>
   );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main style={{ maxWidth: 820, margin: "0 auto" }}>
-      <p>
-        <Link href="/">← Dashboard</Link>
-      </p>
-      {children}
-    </main>
+    <Container>
+      <Link href="/" className="text-sm text-accent hover:underline">
+        ← Dashboard
+      </Link>
+      <div className="mt-3">{children}</div>
+    </Container>
   );
 }

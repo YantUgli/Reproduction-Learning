@@ -1,10 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { IconStopwatch } from "./ui/Icon";
 
 /**
  * Hitung mundur timebox_seconds (§7.6 — bagian desain integritas, bukan hiasan).
  * Saat habis memanggil onExpire SEKALI (parent lalu auto-submit).
+ *
+ * Slot lebar TETAP + tabular-nums: kemunculan/tik timer tak lagi menggeser layout
+ * (masalah UX #2 — judul node bergeser saat timer muncul di L0).
  */
 export default function Timebox({
   seconds,
@@ -42,19 +46,24 @@ export default function Timebox({
   const m = Math.floor(Math.max(left, 0) / 60);
   const s = Math.max(left, 0) % 60;
   const danger = left <= 30;
+  const warn = !danger && left <= 120;
+
+  const tone = danger
+    ? "bg-danger-bg text-danger"
+    : warn
+      ? "bg-warning-bg text-warning"
+      : "bg-neutral-bg text-fg";
+
   return (
     <span
-      style={{
-        fontVariantNumeric: "tabular-nums",
-        fontWeight: 600,
-        color: danger ? "#cf222e" : "#1f2328",
-        background: danger ? "#ffebe9" : "#eaeef2",
-        padding: "2px 8px",
-        borderRadius: 6,
-      }}
-      title="Timebox — batas waktu berpikir"
+      role="timer"
+      aria-live={danger ? "assertive" : "off"}
+      aria-label={`Sisa waktu ${m} menit ${s} detik. Saat habis, kode otomatis dikirim.`}
+      className={`inline-flex w-[104px] items-center justify-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold tabular-nums ${tone}`}
+      title="Timebox — batas waktu berpikir. Saat habis, kode otomatis dikirim & dinilai."
     >
-      ⏱ {m}:{String(s).padStart(2, "0")}
+      <IconStopwatch size={14} />
+      sisa {m}:{String(s).padStart(2, "0")}
     </span>
   );
 }

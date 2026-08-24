@@ -15,11 +15,17 @@ import {
 import Markdown from "../../components/Markdown";
 import ProbeCard from "../../components/ProbeCard";
 import Timebox from "../../components/Timebox";
+import TestOutput from "../../components/TestOutput";
+import Container from "../../components/ui/Container";
+import Button from "../../components/ui/Button";
+import { IconArrowRight, IconCheck } from "../../components/ui/Icon";
+import ErrorState from "../../components/ui/ErrorState";
+import { EditorSkeleton } from "../../components/ui/Skeleton";
 
 // Monaco butuh window → jangan SSR.
 const SandboxEditor = dynamic(() => import("../../components/SandboxEditor"), {
   ssr: false,
-  loading: () => <p>Memuat editor…</p>,
+  loading: () => <p className="text-muted">Memuat editor…</p>,
 });
 
 export default function NodeSession({ params }: { params: { id: string } }) {
@@ -73,9 +79,33 @@ export default function NodeSession({ params }: { params: { id: string } }) {
     codeRef.current = v;
   };
 
+  // Cegah refresh/tutup tab tak sengaja saat ada kode yang belum dikirim.
+  useEffect(() => {
+    const dirtyNow = Boolean(level && level.editable && !grade && code !== level.code);
+    if (!dirtyNow) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [level, grade, code]);
+
   const isLast = node && levelIndex >= node.levels.length - 1;
 
-  const goToLevel = (idx: number) => setLevelIndex(idx);
+  // "Kotor" = ada ketikan yang belum dikirim di level yang bisa diedit & belum dinilai.
+  const dirty = Boolean(level && level.editable && !grade && code !== level.code);
+
+  const goToLevel = (idx: number) => {
+    if (
+      dirty &&
+      idx !== levelIndex &&
+      !window.confirm("Kode di editor belum dikirim dan akan hilang saat pindah level. Lanjut?")
+    ) {
+      return;
+    }
+    setLevelIndex(idx);
+  };
 
   const submit = useCallback(
     async (timeboxExceeded: boolean) => {
@@ -127,18 +157,22 @@ export default function NodeSession({ params }: { params: { id: string } }) {
 
   if (error) {
     return (
-      <main style={{ maxWidth: 820, margin: "0 auto" }}>
+      <Container>
         <BackLink />
-        <p style={{ color: "#cf222e" }}>Error: {error}</p>
-      </main>
+        <div className="mt-3">
+          <ErrorState error={error} onRetry={() => location.reload()} />
+        </div>
+      </Container>
     );
   }
   if (!node || !level) {
     return (
-      <main style={{ maxWidth: 820, margin: "0 auto" }}>
+      <Container>
         <BackLink />
-        <p>Memuat…</p>
-      </main>
+        <div className="mt-4">
+          <EditorSkeleton />
+        </div>
+      </Container>
     );
   }
 
@@ -146,154 +180,142 @@ export default function NodeSession({ params }: { params: { id: string } }) {
   const cleanPass = grade?.passed && acquired;
 
   return (
-    <main style={{ maxWidth: 820, margin: "0 auto" }}>
+    <Container>
       <BackLink />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <h1 style={{ marginBottom: 4 }}>{node.concept}</h1>
+      <div className="mt-2 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight">{node.concept}</h1>
+          <div className="mt-0.5 font-mono text-xs text-subtle">{node.id}</div>
+        </div>
         {isVerify && (
-          <Timebox
-            seconds={level.timebox_seconds}
-            running={isVerify && !grade}
-            onExpire={() => submit(true)}
-          />
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            <Timebox
+              seconds={level.timebox_seconds}
+              running={isVerify && !grade}
+              onExpire={() => submit(true)}
+            />
+            {!grade && (
+              <span className="text-13 text-muted">
+                Habis waktu = kode otomatis dikirim
+              </span>
+            )}
+          </div>
         )}
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#57606a" }}>{node.id}</div>
 
       {/* Peta level — user selalu tahu posisinya, dan bisa lompat bebas
           (mis. balik ke L3 melihat materi lagi). Aman untuk invariant §1:
           L3–L1 tak mengirim attempt, sinyal reproduce-without-AI dihitung dari
-          attempt L0. */}
-      <div style={{ display: "flex", gap: 6, margin: "1rem 0", alignItems: "center" }}>
-        {node.levels.map((lv, i) => (
-          <button
-            key={lv}
-            type="button"
-            onClick={() => goToLevel(i)}
-            title={i === levelIndex ? `Kamu di ${lv}` : `Lompat ke ${lv}`}
-            style={{
-              padding: "3px 10px",
-              borderRadius: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              border: "1px solid transparent",
-              cursor: "pointer",
-              background: i === levelIndex ? "#0969da" : "#eaeef2",
-              color: i === levelIndex ? "#fff" : "#57606a",
-            }}
-          >
-            {lv}
-          </button>
-        ))}
-        <span style={{ fontSize: 12, color: "#8c959f", marginLeft: 4 }}>
-          ← klik untuk pindah level (mis. balik ke L3 lihat materi)
+          attempt L0.
+
+          PENTING: level yang sudah DILEWATI ditandai NETRAL (titik + border), BUKAN
+          centang hijau. Centang hijau = "terverifikasi benar lewat eksekusi"; melewati
+          scaffold hanyalah navigasi, tak ada test yang jalan. Memberi ✓ hijau di sini
+          justru memproduksi illusion of competence yang ditolak invariant §1. */}
+      <div className="my-4 flex flex-wrap items-center gap-1.5">
+        {node.levels.map((lv, i) => {
+          const active = i === levelIndex;
+          const visited = i < levelIndex; // scaffold sudah dilewati (navigasi, bukan lulus test)
+          return (
+            <button
+              key={lv}
+              type="button"
+              onClick={() => goToLevel(i)}
+              aria-current={active ? "step" : undefined}
+              title={active ? `Kamu di ${lv}` : visited ? `Kembali ke ${lv}` : `Lompat ke ${lv}`}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-13 font-semibold transition-colors ${
+                active
+                  ? "border-accent bg-accent text-accent-fg"
+                  : visited
+                    ? "border-border bg-surface text-fg hover:bg-surface-muted"
+                    : "border-transparent bg-neutral-bg text-muted hover:bg-border-muted"
+              }`}
+            >
+              {visited && (
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-subtle"
+                />
+              )}
+              {lv}
+            </button>
+          );
+        })}
+        <span className="ml-1 text-xs text-subtle">
+          klik untuk pindah level (mis. balik ke L3 lihat materi)
         </span>
       </div>
 
-      <h2 style={{ fontSize: 18 }}>{level.title}</h2>
-      <div
-        style={{
-          background: "#f6f8fa",
-          border: "1px solid #d0d7de",
-          borderRadius: 8,
-          padding: "0.5rem 1rem",
-        }}
-      >
+      <h2 className="text-lg font-semibold">{level.title}</h2>
+      <div className="mt-2 rounded-md border border-border bg-surface-muted px-4 py-3">
         <Markdown>{level.prompt}</Markdown>
       </div>
 
       {level.signature_contract && (
-        <p style={{ fontFamily: "monospace", fontSize: 13, color: "#57606a" }}>
+        <p className="mt-2 font-mono text-13 text-muted">
           contract: {level.signature_contract}
         </p>
       )}
 
-      <div style={{ margin: "1rem 0" }}>
+      <div className="my-4">
         <SandboxEditor
           value={code}
           onChange={onCodeChange}
+          language={level.language}
           readOnly={!level.editable || Boolean(grade)}
+          onSubmit={
+            isVerify && !grade && !submitting ? () => submit(false) : undefined
+          }
         />
       </div>
 
       {/* Aksi per level */}
       {!isVerify && (
-        <button onClick={() => !isLast && goToLevel(levelIndex + 1)} disabled={Boolean(isLast)}>
+        <Button
+          variant="primary"
+          onClick={() => !isLast && goToLevel(levelIndex + 1)}
+          disabled={Boolean(isLast)}
+        >
           {level.kind === "worked_example"
-            ? "Saya paham — coba reproduksi →"
-            : "Lanjut (pudarkan scaffold) →"}
-        </button>
+            ? "Saya paham — coba reproduksi"
+            : "Lanjut (pudarkan scaffold)"}
+          <IconArrowRight size={15} />
+        </Button>
       )}
 
       {isVerify && !grade && (
-        <button onClick={() => submit(false)} disabled={submitting}>
+        <Button variant="primary" onClick={() => submit(false)} loading={submitting}>
           {submitting ? "Menjalankan…" : "Jalankan & Verifikasi"}
-        </button>
+        </Button>
       )}
 
       {/* Hasil test — kegagalan DITAMPILKAN (cermin §7.6) */}
       {grade && (
-        <div style={{ marginTop: 16 }}>
-          <div
-            style={{
-              fontWeight: 700,
-              color: grade.passed ? "#1a7f37" : "#cf222e",
-            }}
-          >
-            {grade.passed ? "TEST PASS ✓" : "TEST FAIL ✗"}
-            {grade.timed_out && " (timeout eksekusi)"}
-          </div>
-          <pre
-            style={{
-              background: "#0d1117",
-              color: "#e6edf3",
-              padding: "0.75rem 1rem",
-              borderRadius: 8,
-              overflowX: "auto",
-              fontSize: 13,
-              maxHeight: 260,
-            }}
-          >
-            {grade.test_output || "(tanpa output)"}
-          </pre>
+        <div className="mt-4">
+          <TestOutput passed={grade.passed} output={grade.test_output} timedOut={grade.timed_out} />
 
           {!grade.passed && (
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => goToLevel(levelIndex)}>Coba lagi (level ini)</button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => goToLevel(levelIndex)}>
+                Coba lagi (level ini)
+              </Button>
               {levelIndex > 0 && (
-                <button onClick={() => goToLevel(levelIndex - 1)}>
+                <Button variant="secondary" onClick={() => goToLevel(levelIndex - 1)}>
                   Naik scaffold ({node.levels[levelIndex - 1]})
-                </button>
+                </Button>
               )}
             </div>
           )}
 
           {!grade.passed && explanation && (
-            <details style={{ marginTop: 12 }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+            <details className="mt-3 rounded-md border border-border bg-surface">
+              <summary className="cursor-pointer px-4 py-2.5 font-semibold">
                 Materi just-in-time untuk node ini
               </summary>
-              <div
-                style={{
-                  background: "#f6f8fa",
-                  border: "1px solid #d0d7de",
-                  borderRadius: 8,
-                  padding: "0.5rem 1rem",
-                  marginTop: 8,
-                }}
-              >
+              <div className="border-t border-border px-4 py-3">
                 <Markdown>{explanation.markdown}</Markdown>
                 {explanation.worked_example && (
-                  <pre
-                    style={{
-                      background: "#0d1117",
-                      color: "#e6edf3",
-                      padding: "0.75rem 1rem",
-                      borderRadius: 8,
-                      overflowX: "auto",
-                      fontSize: 13,
-                    }}
-                  >
+                  <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg p-4 text-13 text-code-fg">
                     {explanation.worked_example}
                   </pre>
                 )}
@@ -305,63 +327,61 @@ export default function NodeSession({ params }: { params: { id: string } }) {
 
       {/* Probe hanya setelah test PASS di L0 */}
       {grade?.passed && isVerify && probe && !cleanPass && (
-        <div style={{ marginTop: 16 }}>
-          <ProbeCard
-            probe={probe}
-            disabled={false}
-            outcome={probeResult}
-            onSubmit={answerProbe}
-          />
+        <div className="mt-4">
+          <ProbeCard probe={probe} disabled={false} outcome={probeResult} onSubmit={answerProbe} />
+          {probeResult === "incorrect" && (
+            <p className="mt-2 rounded-md border border-warning bg-warning-bg px-4 py-2.5 text-13 text-warning">
+              Produksimu terbukti (test hijau), tapi probe menunjukkan pemahaman masih
+              rapuh — sukses berjarak <strong>belum bertambah</strong> dan interval review
+              diperpendek. Jawab probe dengan benar untuk menuntaskan akuisisi.
+            </p>
+          )}
         </div>
       )}
 
       {cleanPass && (
-        <div
-          style={{
-            marginTop: 16,
-            padding: "1rem 1.25rem",
-            background: "#dafbe1",
-            border: "1px solid #1a7f37",
-            borderRadius: 8,
-          }}
-        >
-          <strong style={{ color: "#1a7f37" }}>
+        <div className="mt-4 rounded-md border border-success bg-success-bg px-5 py-4">
+          <strong className="inline-flex items-center gap-1.5 text-success">
+            <IconCheck size={16} />
             {schedule?.became_mastered
-              ? "Node mastered 🎉 (reproduce-without-AI terbukti berulang & berjarak)"
-              : "Node acquired ✓ (reproduce-without-AI terbukti)"}
+              ? "Node mastered (reproduce-without-AI terbukti berulang & berjarak)"
+              : "Node acquired (reproduce-without-AI terbukti)"}
           </strong>
-          <p style={{ margin: "6px 0 0", color: "#57606a" }}>
+          <p className="mt-1.5 text-13 text-muted">
             {schedule?.became_mastered ? (
               <>
                 Sukses berjarak {schedule.consecutive_success}/{schedule.successes_needed} —
                 terpenuhi. Node tetap dijadwalkan; gagal di jatuh tempo mana pun
-                menurunkannya jadi <code>lapsed</code>.
+                menurunkannya jadi <code className="font-mono">lapsed</code>.
               </>
             ) : (
               <>
-                Status <code>acquired</code> — belum <code>mastered</code>. Mastery butuh{" "}
+                Status <code className="font-mono">acquired</code> — belum{" "}
+                <code className="font-mono">mastered</code>. Mastery butuh{" "}
                 {schedule?.successes_needed ?? 4}× lolos <strong>berjarak</strong>; baru{" "}
                 {schedule?.consecutive_success ?? 1}.
               </>
             )}
           </p>
           {schedule?.due_at && (
-            <p style={{ margin: "6px 0 0", color: "#57606a" }}>
+            <p className="mt-1.5 text-13 text-muted">
               Masuk jadwal review: ~{schedule.interval_days?.toFixed(1)} hari lagi (
               {new Date(schedule.due_at).toLocaleDateString()}).
             </p>
           )}
-          <Link href="/">← Kembali ke daftar node</Link>
+          <Link href="/" className="mt-2 inline-block text-sm text-accent hover:underline">
+            ← Kembali ke dashboard
+          </Link>
         </div>
       )}
-    </main>
+    </Container>
   );
 }
 
 function BackLink() {
   return (
-    <p>
-      <Link href="/">← Daftar node</Link>
-    </p>
+    <Link href="/" className="text-sm text-accent hover:underline">
+      ← Dashboard
+    </Link>
   );
 }

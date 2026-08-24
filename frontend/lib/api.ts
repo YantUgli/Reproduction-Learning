@@ -30,6 +30,8 @@ export interface LevelView {
   editable: boolean;
   show_timebox: boolean;
   timebox_seconds: number;
+  /** Mode highlight editor — diturunkan backend dari berkas node (M6). */
+  language: string;
 }
 
 export interface SubmitOut {
@@ -112,6 +114,7 @@ export interface ReviewChallenge {
   timebox_seconds: number;
   previous_instance_id: string | null;
   needs_more_variants: boolean;
+  language: string;
 }
 
 export interface Outcome {
@@ -153,6 +156,7 @@ export interface PlacementChallenge {
   signature_contract: string;
   timebox_seconds: number;
   position: number;
+  language: string;
 }
 
 export interface PlacementState {

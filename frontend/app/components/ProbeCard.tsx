@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { Probe } from "../../lib/api";
+import Button from "./ui/Button";
+import { IconCheck, IconX } from "./ui/Icon";
 
 /**
  * Render comprehension probe DETERMINISTIK (predict_output | spot_bug | trace).
@@ -21,57 +23,53 @@ export default function ProbeCard({
   const [selected, setSelected] = useState<string | null>(null);
 
   return (
-    <div
-      style={{
-        border: "1px solid #d0d7de",
-        borderRadius: 8,
-        padding: "1rem 1.25rem",
-        background: "#f6f8fa",
-      }}
-    >
-      <div style={{ fontSize: 12, textTransform: "uppercase", color: "#57606a" }}>
+    <div className="rounded-md border border-border bg-surface-muted p-5">
+      <div className="text-xs font-medium uppercase tracking-wide text-muted">
         Comprehension probe · {probe.type}
       </div>
-      <p style={{ fontWeight: 600, marginTop: 8 }}>{probe.question}</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {probe.options.map((opt) => (
-          <label
-            key={opt}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 10px",
-              border: "1px solid #d0d7de",
-              borderRadius: 6,
-              background: selected === opt ? "#ddf4ff" : "#fff",
-              cursor: disabled ? "default" : "pointer",
-            }}
-          >
-            <input
-              type="radio"
-              name={`probe-${probe.id}`}
-              value={opt}
-              checked={selected === opt}
-              disabled={disabled}
-              onChange={() => setSelected(opt)}
-            />
-            <code>{opt}</code>
-          </label>
-        ))}
+      <p className="mt-2 font-semibold text-fg">{probe.question}</p>
+      <div className="mt-3 flex flex-col gap-2">
+        {probe.options.map((opt) => {
+          const active = selected === opt;
+          return (
+            <label
+              key={opt}
+              className={`flex items-center gap-2.5 rounded-md border px-3 py-2 transition-colors ${
+                disabled ? "cursor-default" : "cursor-pointer hover:border-accent"
+              } ${active ? "border-accent bg-info-bg" : "border-border bg-surface"}`}
+            >
+              <input
+                type="radio"
+                name={`probe-${probe.id}`}
+                value={opt}
+                checked={active}
+                disabled={disabled}
+                onChange={() => setSelected(opt)}
+                className="accent-accent"
+              />
+              <code className="font-mono text-sm">{opt}</code>
+            </label>
+          );
+        })}
       </div>
-      <button
-        style={{ marginTop: 12 }}
+      <Button
+        variant="primary"
+        size="sm"
+        className="mt-3"
         disabled={disabled || selected === null}
         onClick={() => selected && onSubmit(selected)}
       >
         Kirim jawaban probe
-      </button>
+      </Button>
       {outcome === "correct" && (
-        <p style={{ color: "#1a7f37", fontWeight: 600 }}>Probe benar ✓</p>
+        <p className="mt-2 inline-flex items-center gap-1.5 font-semibold text-success">
+          <IconCheck size={15} /> Probe benar
+        </p>
       )}
       {outcome === "incorrect" && (
-        <p style={{ color: "#cf222e", fontWeight: 600 }}>Probe salah — coba lagi.</p>
+        <p className="mt-2 inline-flex items-center gap-1.5 font-semibold text-danger">
+          <IconX size={15} /> Probe salah — coba lagi.
+        </p>
       )}
     </div>
   );
