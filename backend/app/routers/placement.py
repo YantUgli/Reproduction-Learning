@@ -31,6 +31,7 @@ class ChallengeOut(BaseModel):
     prompt: str
     signature_contract: str
     timebox_seconds: int
+    language: str = "plaintext"
     position: int
 
 

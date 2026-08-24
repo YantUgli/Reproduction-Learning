@@ -6,7 +6,7 @@ sekarang; Docker/Pyodide nanti) bisa ditukar tanpa mengubah pemanggil.
 """
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 @dataclass
@@ -19,6 +19,9 @@ class ExecutionResult:
     exit_code: int | None
 
 
+# runtime_checkable supaya kontraknya bisa DIUJI (`isinstance`), bukan cuma
+# dipercaya — sejak M6 ada dua implementasi berbeda bahasa di baliknya.
+@runtime_checkable
 class Executor(Protocol):
     def run(
         self,

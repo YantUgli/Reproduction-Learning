@@ -12,6 +12,9 @@ dependencies = [
     # Scheduler spaced repetition (M4). JANGAN tulis algoritma SR sendiri —
     # CLAUDE.md §2 / PRD §7.5.
     "fsrs>=6,<7",
+    # Domain ML (M6). Dipakai node `value_assert` (di dalam subprocess grading) dan
+    # oleh authoring untuk MENGHITUNG nilai acuan `expected.json` — bukan mengetiknya.
+    "numpy>=2,<3",
 ]
 
 [project.optional-dependencies]

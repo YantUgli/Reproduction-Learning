@@ -1,0 +1,14 @@
+id: r001_state_counter
+domain_id: react
+concept: "useState + event handler: klik mengubah state, UI ikut berubah"
+description: >
+  Node paling fondasional React: satu potong state lokal, satu handler, dan UI yang
+  merupakan fungsi dari state. Diuji lewat PERILAKU (teks setelah klik), bukan
+  struktur JSX.
+grader_type: dom_behavior
+estimated_minutes: 15
+timebox_seconds: 1080
+status_default: available
+source_refs: [react_docs_state]
+signature_contract: "export default function C() { const [x, setX] = useState(<awal>); ... }"
+scaffold_level: L2

@@ -1,0 +1,14 @@
+id: m002_sigmoid_bce
+domain_id: ml
+concept: "sigmoid tanpa overflow + binary cross-entropy dengan clipping"
+description: >
+  Dua komponen yang selalu berpasangan di klasifikasi biner. Keduanya punya jebakan
+  numerik yang nyata: sigmoid meluap untuk |z| besar, dan BCE jadi inf saat prediksi
+  tepat 0 atau 1. Test menguji keduanya, bukan cuma rumus di kondisi ideal.
+grader_type: value_assert
+estimated_minutes: 20
+timebox_seconds: 1500
+status_default: locked
+source_refs: [ml_goodfellow_dl_ch6]
+signature_contract: "def sigmoid(z) -> np.ndarray; def binary_cross_entropy(y_true, y_pred, eps=1e-12) -> float"
+scaffold_level: L2

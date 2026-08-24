@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Muat seluruh `data/` ke SQLite (M2 langkah 6).
+"""Muat seluruh `data/` ke SQLite (M2 langkah 6, multi-domain sejak M6).
 
-Panggil node_loader untuk domain fastapi. Idempoten. Cetak ringkasan.
+Memuat SETIAP domain di `data/domains/*`. Idempoten. Cetak ringkasan per domain.
 
 Pemakaian:
-    python scripts/load_nodes.py
+    python scripts/load_nodes.py [domain ...]
 """
 
 import sys
@@ -20,18 +20,25 @@ from app.db import engine, init_db  # noqa: E402
 from app.services.node_loader import load_domain_into_db  # noqa: E402
 
 
-def main() -> int:
+def main(argv: list[str]) -> int:
     init_db()
-    domain_dir = DATA_DIR / "domains" / "fastapi"
-    with Session(engine) as session:
-        report = load_domain_into_db(session, domain_dir)
-    print(
-        "loaded: "
-        f"{report.domains} domain, {report.sources} source, {report.nodes} node, "
-        f"{report.instances} instance, {report.probes} probe, {report.edges} edge"
+    root = DATA_DIR / "domains"
+    domain_dirs = (
+        [root / name for name in argv]
+        if argv
+        else sorted(p for p in root.iterdir() if p.is_dir())
     )
+
+    with Session(engine) as session:
+        for domain_dir in domain_dirs:
+            report = load_domain_into_db(session, domain_dir)
+            print(
+                f"loaded {domain_dir.name}: "
+                f"{report.nodes} node, {report.instances} instance, "
+                f"{report.probes} probe, {report.edges} edge"
+            )
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

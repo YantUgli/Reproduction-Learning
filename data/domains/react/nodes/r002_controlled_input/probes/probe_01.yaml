@@ -1,0 +1,10 @@
+id: r002_probe_01
+node_id: r002_controlled_input
+type: spot_bug
+question: "Sebuah input ditulis `<input value={name} />` TANPA onChange. Apa perilakunya saat user mengetik?"
+options:
+  - "Teks yang diketik tidak pernah muncul — nilainya terkunci ke state"
+  - "Teks muncul normal dan state ikut ter-update"
+  - "Teks muncul, tapi state tetap kosong"
+  - "React melempar error saat mengetik"
+correct_answer: "Teks yang diketik tidak pernah muncul — nilainya terkunci ke state"

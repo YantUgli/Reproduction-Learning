@@ -1,0 +1,14 @@
+id: r002_controlled_input
+domain_id: react
+concept: "Input terkendali: value dari state, onChange menyetel state"
+description: >
+  Input terkendali adalah dasar semua form React: nilai yang tampil SELALU berasal
+  dari state, dan satu-satunya jalan mengubahnya adalah handler. Diuji lewat mengetik
+  sungguhan di DOM.
+grader_type: dom_behavior
+estimated_minutes: 18
+timebox_seconds: 1200
+status_default: locked
+source_refs: [react_docs_controlled_component]
+signature_contract: "<input value={x} onChange={(e) => setX(e.target.value)} />"
+scaffold_level: L2

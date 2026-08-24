@@ -48,6 +48,7 @@ node berurutan di file data.
 | DB | SQLite via SQLModel | Single-user local-first; SQLModel = SQLAlchemy+pydantic, idiom FastAPI |
 | Node/edge store | YAML di `data/`, di-commit ke git | Kurasi manual, bisa di-diff & di-review seperti kode |
 | Domain pertama | FastAPI (`unit_test`) | Grader paling deterministik (status/body HTTP itu biner) |
+| Domain kedua & ketiga (M6) | React (`dom_behavior`, Node+vitest+jsdom) & ML (`value_assert`, numpy) | Menambah domain = menambah grader di balik `Executor`/`Grader` yang sama. Tak ada kolom DB baru, tak ada cabang per-domain di loop. |
 | Integrasi Claude Code | async via file artifact, bukan HTTP | Ia agent CLI (PRD §10). Fase 1/M3 harus jalan **tanpa** ini. |
 
 Kalau kamu benar-benar perlu mengubah salah satu, catat di **§7 Log keputusan**
@@ -129,8 +130,16 @@ cd backend && uvicorn app.main:app --reload
 # Test + lint backend
 cd backend && pytest && ruff check .
 
-# Muat seluruh node data/ ke SQLite (idempoten; jalankan dari repo root)
-python scripts/load_nodes.py
+# Muat seluruh node data/ ke SQLite (SEMUA domain; idempoten; dari repo root)
+python scripts/load_nodes.py            # atau: python scripts/load_nodes.py react
+
+# Gerbang mutu authoring — semua domain, lewat grader masing-masing (M6).
+# DUA pemeriksaan per instance: referensi wajib HIJAU, starter wajib MERAH.
+python scripts/verify_nodes.py                 # atau: ... verify_nodes.py ml
+python scripts/verify_nodes.py --skip-starter  # 2x lebih cepat; JANGAN untuk commit
+
+# Runtime grading React (M6) — sekali saja, sebelum node React bisa dinilai
+cd runtime/react && npm install
 
 # Frontend (M3+)
 cd frontend && npm run dev
@@ -330,9 +339,87 @@ alasan · alternatif yang ditolak.
   sebagai indeks: deterministik (bisa di-test), tapi tak menyodorkan pertanyaan yang sama
   tiap node muncul lagi. *Ditolak:* acak (tak bisa di-test & tak bisa direproduksi).
 
+- **2026-08-22 · M6 · Domain kedua/ketiga: React (`dom_behavior`) & ML (`value_assert`).
+  Runtime React = Node + vitest + jsdom di `runtime/react/`, di balik `Executor` yang
+  SAMA.** Interface M1 terbukti menyembunyikan bahasa runtime: `NodeExecutor` memenuhi
+  Protocol yang sama dengan `SubprocessExecutor`, dan tak satu pun pemanggil (grader,
+  loop, scheduler) tahu bedanya. Dependency JS ter-pin di `package.json` — analog venv
+  ter-pin. *Ditolak:* menjalankan React lewat Pyodide/subprocess Python (mustahil),
+  dan menyalin `node_modules` per grading (absurd) — direktori kerja grading justru
+  ditaruh di bawah `runtime/react/.work/` supaya resolusi `node_modules` menaik normal.
+
+- **2026-08-22 · M6 · `REACT_EXECUTION_TIMEOUT_SECONDS = 120`, bukan 10 seperti Python.**
+  Bukan karena kode React lebih lambat, tapi karena start-up-nya: vitest menyalakan
+  jsdom + mentransform JSX (±50 detik dingin, ±7 detik panas). Menyamakannya dengan
+  10 detik akan membuat submisi BENAR ter-grade FAIL — kegagalan terburuk untuk sistem
+  yang seluruh kepercayaannya bersandar pada sinyal pass/fail.
+
+- **2026-08-22 · M6 · Toleransi numerik ML hidup di `data/` (`expected.json`:
+  `rtol`/`atol`), BUKAN di kolom DB.** Kolom `rtol` akan jadi kolom khusus-ML pertama
+  di skema yang sengaja tak tahu domainnya apa (§9/M0) — persis kebocoran yang M6 ada
+  untuk mengujinya. Sebagai berkas di folder instance, ia ikut di-review & di-diff
+  seperti kode. Grader `value_assert` merakitnya jadi modul `expected` yang di-import
+  hidden test. *Ditolak:* menanam angka toleransi di dalam hidden test (tak terlihat
+  saat review node) dan kolom DB baru.
+
+- **2026-08-22 · M6 · `metric_threshold` TIDAK didaftarkan sama sekali; `structural`
+  ditunda sampai ada node arsitektur.** `metric_threshold` mengukur HASIL — Bryant bisa
+  menyalin training loop dan menembus ambang tanpa paham (§7.4/§8), jadi ia tak boleh
+  jadi jalur termudah yang tersedia. `structural` ditunda karena grader tanpa node
+  adalah kode yang tak pernah dijalankan, dan itu yang paling cepat membusuk.
+
+- **2026-08-22 · M6 · Bahasa editor diturunkan dari BERKAS node, bukan dari `domain_id`.**
+  `graders/files.editor_language` memetakan ekstensi (`.py`/`.jsx`) → mode Monaco, lalu
+  ikut di response `LevelView`/`ReviewChallenge`/`PlacementChallenge`. Alternatif yang
+  ditolak: `if domain == "react"` di UI (cabang per-domain pertama, dan pintu masuk
+  untuk cabang berikutnya) atau kolom `language` baru di DB (menggores §9).
+
+- **2026-08-23 · Gerbang authoring `verify_nodes.py` kini menuntut DUA hal: referensi
+  hijau DAN `starter_code` merah.** Pemeriksaan kedua sebelumnya cuma dijalankan
+  ad-hoc saat authoring A2/M6. Alasan menaikkannya jadi gerbang: kerangka L2 yang sudah
+  lolos apa adanya membuat node itu bukan sekadar tak berguna — ia MEMALSUKAN sinyal
+  inti produk, karena Bryant bisa menekan "Jalankan" tanpa memproduksi apa pun dan
+  tercatat sebagai `reproduce-without-AI` yang berhasil. Aturan yang sama sudah berlaku
+  untuk soal buatan AI sejak gate R4 (M5); tak ada alasan node tulisan tangan lolos
+  dengan standar lebih rendah. Biayanya waktu run 2x lipat (±5 menit untuk 39 instance);
+  disediakan `--skip-starter` untuk iterasi cepat, dengan peringatan tercetak agar tak
+  dipakai sebagai dasar commit. *Ditolak:* menjadikannya peringatan saja (gerbang yang
+  boleh diabaikan bukan gerbang).
+
+- **2026-08-22 · M6 · Perbaikan kebocoran abstraksi yang baru terlihat saat ada domain
+  kedua.** (a) `node_loader` mengenali berkas instance dari NAMA DASAR, bukan ekstensi
+  `.py`. (b) `verify_nodes.py` kini memverifikasi lewat `get_grader(...)` — gerbang
+  authoring menguji persis yang dinilai saat submit, bukan salinan aturannya sendiri.
+  (c) `load_domain_into_db` hanya me-reset edge MILIK DOMAIN yang dimuat; versi lama
+  menghapus seluruh tabel Edge, yang begitu domain kedua masuk akan diam-diam membuka
+  node terkunci di domain pertama. (d) `Executor`/`Grader` Protocol jadi
+  `runtime_checkable` supaya kontraknya bisa DIUJI, bukan cuma dipercaya.
+
 - **2026-08-22 · M5 · R2 mendapat akses baca repo lewat `--add-dir`, bukan lewat cwd.**
   cwd proses Claude Code selalu direktori job — supaya satu-satunya tempat ia bisa
   menulis adalah `artifacts/`. Repo Bryant ditambahkan terpisah sebagai direktori yang
   boleh DIBACA. Argv lengkap disimpan ke `command.log` tiap job: saat artifact-nya aneh,
   pertanyaan pertama selalu "dipanggil dengan flag apa", dan menebaknya belakangan mahal
   (biaya ini sudah dibayar sekali saat verifikasi).
+
+- **2026-08-23 · M-UI · Fondasi styling frontend = Tailwind CSS v3.4 + design tokens
+  (CSS variables). DEVIASI SADAR dari §11 (stack condong ke yang sudah dikuasai).**
+  Sampai M6 seluruh frontend memakai inline `style={{}}` (nol file CSS), warna Primer
+  di-hardcode & diduplikasi di ~12 berkas, semua tombol default browser — akibatnya
+  aksi terpenting produk (**Jalankan & Verifikasi**) tak terbedakan dari aksi sekunder,
+  dan UI terasa "kosong & kaku". Isyah memilih Tailwind (bukan CSS murni yang
+  direkomendasikan agent demi §11) untuk iterasi cepat + ekosistem. Mitigasi risiko §11:
+  warna TIDAK di-hardcode di config — semua menunjuk CSS variable di `app/globals.css`
+  (`:root`), jadi satu sumber kebenaran warna dan jalur dark mode nanti cukup tambah
+  blok `.dark`. Dibangun komponen primitif (`app/components/ui/{Button,Card,Container,
+  PageHeader,EmptyState,Badge,Icon}`) yang menutup duplikasi. **Batasan Isyah: TANPA
+  emoji** (bikin tampilan terasa "AI slop") — status/verdict pakai warna token + ikon
+  garis SVG inline (bukan icon-pack, bukan emoji); glyph `🎉`/`✓`/`✗`/`⏱`/`⚠` lama
+  diganti. Perbaikan UX terukur ikut dikerjakan: CTA primer dibedakan, timebox slot
+  lebar tetap (tak lagi menggeser layout), hint editor kosong, feedback "PASS tapi probe
+  salah" diberi kalimat konsekuensi, peta progres dikelompokkan per domain (tetap DAFTAR
+  LINEAR — §8 tak dilanggar, bukan DAG explorer). Invariant dijaga: SandboxEditor tetap
+  matikan semua AI-assist (§2), TestOutput tetap menampilkan kegagalan (§7.6). Pass ini
+  murni frontend — tak ada perubahan backend/DB/skema. *Ditolak:* CSS murni (lebih
+  selaras §11 tapi iterasi lebih lambat & tanpa ekosistem utility), component library
+  (shadcn/MUI — paling berat, menarik banyak dependency, paling jauh dari §11).

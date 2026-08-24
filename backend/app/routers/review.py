@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from app.db import get_session
+from app.graders.files import editor_language
 from app.models import Node, ScheduleItem
 from app.services.attempt_service import submit_attempt
 from app.services.mastery import IN_SCHEDULE, Outcome, apply_outcome
@@ -47,6 +48,7 @@ class ReviewChallenge(BaseModel):
     timebox_seconds: int
     previous_instance_id: str | None
     needs_more_variants: bool
+    language: str = "plaintext"
 
 
 class OutcomeOut(BaseModel):
@@ -189,6 +191,7 @@ def get_challenge(node_id: str, session: Session = Depends(get_session)) -> Revi
         timebox_seconds=node.timebox_seconds,
         previous_instance_id=picked.previous_instance_id,
         needs_more_variants=picked.needs_more_variants,
+        language=editor_language(picked.instance),
     )
 
 

@@ -1,0 +1,19 @@
+# Edge prerequisite antar node React (M6).
+#
+# INVARIANT (PRD §1/§4): edge berasal dari sumber otoritatif + KEPUTUSAN ISYAH.
+# Daftar di bawah di-draft dari struktur docs resmi React; `type` adalah usulan yang
+# WAJIB di-review Isyah. Hanya `hard` yang mengikat urutan.
+#
+# Arah: from = prasyarat, to = yang bergantung.
+edges:
+  - from: r001_state_counter
+    to: r002_controlled_input
+    type: hard
+    source_ref_id: react_docs_state
+    note: "Input terkendali adalah state yang disetir event — butuh useState lebih dulu."
+
+  - from: r002_controlled_input
+    to: r003_conditional_list
+    type: hard
+    source_ref_id: react_docs_conditional_rendering
+    note: "Render bersyarat + list dilatih atas data yang berubah dari input terkendali."

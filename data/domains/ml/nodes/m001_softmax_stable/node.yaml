@@ -1,0 +1,14 @@
+id: m001_softmax_stable
+domain_id: ml
+concept: "softmax stabil secara numerik (kurangi maksimum sebelum eksponensiasi)"
+description: >
+  Komponen kecil yang jadi fondasi klasifikasi: mengubah skor jadi distribusi
+  peluang. Yang dilatih bukan rumusnya saja, tapi trik stabilitas — versi naifnya
+  meledak jadi inf untuk input besar dan itu terlihat langsung di test.
+grader_type: value_assert
+estimated_minutes: 15
+timebox_seconds: 1080
+status_default: available
+source_refs: [ml_goodfellow_dl_ch6, numpy_docs_broadcasting]
+signature_contract: "def softmax(x: np.ndarray) -> np.ndarray"
+scaffold_level: L2

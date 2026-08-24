@@ -32,14 +32,19 @@ from app.models import (
 )
 from app.services.node_schema import EdgeYaml, NodeYaml, ProbeYaml, SourceRefYaml
 
-_REQUIRED_INSTANCE_FILES = (
-    "prompt.md",
-    "starter_code.py",
-    "reference_solution.py",
-    "hidden_test.py",
-)
+# Berkas wajib per instance, dikenali dari NAMA DASAR — bukan ekstensinya.
+# (M6) Domain kedua memakai bahasa lain: `reference_solution.jsx` untuk React,
+# `.py` untuk FastAPI/ML. Mengunci ekstensi di sini akan memaksa domain baru
+# menyesuaikan diri dengan Python — kebocoran abstraksi yang justru diuji M6.
+_REQUIRED_INSTANCE_STEMS = ("prompt", "starter_code", "reference_solution", "hidden_test")
 _MIN_INSTANCES = 2
 _MIN_PROBES = 1
+
+
+def find_instance_file(instance_dir: Path, stem: str) -> Path | None:
+    """Berkas `<stem>.<ekstensi apa pun>` di folder instance. None bila tak ada."""
+    matches = sorted(p for p in instance_dir.glob(f"{stem}.*") if p.is_file())
+    return matches[0] if matches else None
 
 
 @dataclass
@@ -112,19 +117,21 @@ def assemble_node(node_dir: Path) -> NodeBundle:
     instances: list[InstanceBundle] = []
     if instances_dir.is_dir():
         for variant_dir in sorted(p for p in instances_dir.iterdir() if p.is_dir()):
-            missing = [f for f in _REQUIRED_INSTANCE_FILES if not (variant_dir / f).exists()]
+            found = {
+                stem: find_instance_file(variant_dir, stem) for stem in _REQUIRED_INSTANCE_STEMS
+            }
+            missing = [f"{stem}.*" for stem, path in found.items() if path is None]
             if missing:
                 raise NodeValidationError(
                     f"{variant_dir}: file instance kurang: {', '.join(missing)}"
                 )
-            hidden_test = variant_dir / "hidden_test.py"
             instances.append(
                 InstanceBundle(
                     variant_label=variant_dir.name,
                     dir=variant_dir,
-                    prompt=_read(variant_dir / "prompt.md"),
-                    starter_code=_read(variant_dir / "starter_code.py"),
-                    hidden_test_path=_rel_to_repo(hidden_test),
+                    prompt=_read(found["prompt"]),
+                    starter_code=_read(found["starter_code"]),
+                    hidden_test_path=_rel_to_repo(found["hidden_test"]),
                 )
             )
     if len(instances) < _MIN_INSTANCES:
@@ -286,8 +293,14 @@ def load_domain_into_db(
             report.probes += 1
 
     # Edges: reset lalu insert (idempoten; PK autoincrement tak bisa merge by pasangan).
+    #
+    # Reset hanya edge MILIK DOMAIN INI (M6). Versi M2 menghapus seluruh tabel Edge —
+    # benar selama cuma ada satu domain, tapi begitu domain kedua dimuat ia akan
+    # menghapus edge domain pertama dan diam-diam membuka semua node yang seharusnya
+    # terkunci. Edge lintas-domain memang tak ada: prasyarat hidup di dalam satu domain.
     edges = load_edges(domain_dir / "edges.yaml")
-    session.exec(delete(Edge))
+    if node_ids:
+        session.exec(delete(Edge).where(Edge.from_node_id.in_(node_ids)))
     for e in edges:
         for endpoint in (e.from_, e.to):
             if endpoint not in node_ids:

@@ -14,7 +14,7 @@ test lain — itu memang harganya: yang diuji adalah sinyal pass/fail asli.
 import pytest
 from sqlmodel import Session, select
 
-from app.graders.unit_test import reference_solution_path
+from app.graders.files import reference_solution_path
 from app.models import (
     Attempt,
     ChallengeInstance,

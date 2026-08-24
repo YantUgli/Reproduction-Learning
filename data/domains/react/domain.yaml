@@ -1,0 +1,5 @@
+# Domain kedua (M6) — React. Membuktikan engine domain-agnostic: loop, scaffold,
+# scheduler, dan mastery TIDAK berubah; yang berbeda hanya grader (`dom_behavior`).
+id: react
+name: React
+status: active

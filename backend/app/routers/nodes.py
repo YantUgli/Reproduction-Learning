@@ -41,6 +41,7 @@ class LevelViewOut(BaseModel):
     editable: bool
     show_timebox: bool
     timebox_seconds: int
+    language: str = "plaintext"
 
 
 class ExplanationOut(BaseModel):

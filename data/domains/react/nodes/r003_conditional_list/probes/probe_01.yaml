@@ -1,0 +1,10 @@
+id: r003_probe_01
+node_id: r003_conditional_list
+type: predict_output
+question: "Daftar berisi 3 item dirender dengan `items.map((it) => <li>{it}</li>)` tanpa prop `key`. Apa akibatnya?"
+options:
+  - "Tetap tampil 3 <li>, tapi React memberi peringatan key di console"
+  - "Hanya item pertama yang tampil"
+  - "React melempar error dan komponen gagal render"
+  - "Item tampil terbalik urutannya"
+correct_answer: "Tetap tampil 3 <li>, tapi React memberi peringatan key di console"

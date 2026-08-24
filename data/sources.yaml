@@ -78,6 +78,38 @@ sources:
     citation: "FastAPI — Dependencies: First Steps"
     url_or_locator: "https://fastapi.tiangolo.com/tutorial/dependencies/"
 
+  # --- Domain kedua (M6) · React ---
+  - id: react_docs_state
+    type: official_docs
+    citation: "React — State: A Component's Memory (useState)"
+    url_or_locator: "https://react.dev/learn/state-a-components-memory"
+
+  - id: react_docs_controlled_component
+    type: official_docs
+    citation: "React — Reacting to Input with State / controlled input"
+    url_or_locator: "https://react.dev/learn/reacting-to-input-with-state"
+
+  - id: react_docs_rendering_lists
+    type: official_docs
+    citation: "React — Rendering Lists (map + key)"
+    url_or_locator: "https://react.dev/learn/rendering-lists"
+
+  - id: react_docs_conditional_rendering
+    type: official_docs
+    citation: "React — Conditional Rendering"
+    url_or_locator: "https://react.dev/learn/conditional-rendering"
+
+  # --- Domain kedua (M6) · ML komponen kecil ---
+  - id: ml_goodfellow_dl_ch6
+    type: textbook_toc
+    citation: "Goodfellow, Bengio, Courville — Deep Learning, Ch. 6 (Deep Feedforward Networks)"
+    url_or_locator: "textbook:deep-learning-goodfellow/ch6"
+
+  - id: numpy_docs_broadcasting
+    type: official_docs
+    citation: "NumPy — Broadcasting & array programming"
+    url_or_locator: "https://numpy.org/doc/stable/user/basics.broadcasting.html"
+
   - id: python_stdlib_pytest
     type: official_docs
     citation: "pytest — Getting Started / assert introspection"

@@ -1,0 +1,14 @@
+# Edge prerequisite antar node ML (M6). `type` adalah USULAN — Isyah yang finalkan.
+# Hanya `hard` yang mengikat urutan.
+edges:
+  - from: m001_softmax_stable
+    to: m002_sigmoid_bce
+    type: soft
+    source_ref_id: ml_goodfellow_dl_ch6
+    note: "Sama-sama fungsi aktivasi + trik stabilitas numerik; urutan ini menghemat kejutan."
+
+  - from: m002_sigmoid_bce
+    to: m003_mse_gradient
+    type: hard
+    source_ref_id: ml_goodfellow_dl_ch6
+    note: "Gradien loss mengandaikan loss-nya sendiri sudah bisa diproduksi dari nol."

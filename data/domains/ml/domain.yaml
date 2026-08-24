@@ -1,0 +1,6 @@
+# Domain ketiga (M6) — ML komponen kecil. Grader `value_assert`: nilai numerik lawan
+# acuan dengan toleransi eksplisit. BUKAN `metric_threshold` (§8): yang diukur adalah
+# apakah komponennya bisa diproduksi, bukan apakah skornya bagus.
+id: ml
+name: ML (komponen kecil)
+status: active

@@ -1,0 +1,14 @@
+id: m003_mse_gradient
+domain_id: ml
+concept: "gradien MSE regresi linear terhadap w dan b (turunan manual, bukan autograd)"
+description: >
+  Inti backprop dalam bentuk terkecilnya: menurunkan loss terhadap parameter dan
+  menuliskannya sebagai operasi matriks. Diverifikasi dua kali — lawan nilai acuan,
+  dan lawan selisih hingga (finite differences).
+grader_type: value_assert
+estimated_minutes: 25
+timebox_seconds: 1800
+status_default: locked
+source_refs: [ml_goodfellow_dl_ch6, numpy_docs_broadcasting]
+signature_contract: "def mse_gradient(X, y, w, b) -> tuple[np.ndarray, float]"
+scaffold_level: L2

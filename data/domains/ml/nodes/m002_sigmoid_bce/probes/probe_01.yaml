@@ -1,0 +1,10 @@
+id: m002_probe_01
+node_id: m002_sigmoid_bce
+type: spot_bug
+question: "BCE ditulis tanpa clipping: `-np.mean(y*np.log(p) + (1-y)*np.log(1-p))`. Apa hasilnya bila ada elemen p tepat 1.0 dengan y = 0?"
+options:
+  - "inf — log(1 - 1.0) = log(0) = -inf"
+  - "0.0 — sukunya hilang karena dikalikan nol"
+  - "nan — pembagian nol dengan nol"
+  - "Nilai berhingga yang sedikit terlalu besar"
+correct_answer: "inf — log(1 - 1.0) = log(0) = -inf"

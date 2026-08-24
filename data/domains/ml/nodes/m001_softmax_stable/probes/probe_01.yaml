@@ -1,0 +1,10 @@
+id: m001_probe_01
+node_id: m001_softmax_stable
+type: predict_output
+question: "softmax ditulis TANPA mengurangi maksimum: `np.exp(x) / np.sum(np.exp(x))`. Apa hasilnya untuk x = [1000, 1001, 1002]?"
+options:
+  - "[nan, nan, nan] — np.exp meluap jadi inf, lalu inf/inf"
+  - "[0.09, 0.24, 0.67] — sama saja, hasilnya benar"
+  - "[0.0, 0.0, 1.0] — pembulatan ke nol"
+  - "Python melempar OverflowError"
+correct_answer: "[nan, nan, nan] — np.exp meluap jadi inf, lalu inf/inf"

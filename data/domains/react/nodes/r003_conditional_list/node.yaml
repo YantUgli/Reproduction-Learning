@@ -1,0 +1,14 @@
+id: r003_conditional_list
+domain_id: react
+concept: "Render bersyarat + daftar dari array state (tambah item, keadaan kosong)"
+description: >
+  UI yang bergantung pada bentuk data: daftar kosong menampilkan pesan khusus,
+  daftar berisi menampilkan satu elemen per item. Melatih map + kondisi, dua hal yang
+  paling sering dipakai dan paling sering salah.
+grader_type: dom_behavior
+estimated_minutes: 20
+timebox_seconds: 1500
+status_default: locked
+source_refs: [react_docs_rendering_lists, react_docs_conditional_rendering]
+signature_contract: "{items.length === 0 ? <p>…</p> : <ul>{items.map((it) => <li key={…}>…</li>)}</ul>}"
+scaffold_level: L2

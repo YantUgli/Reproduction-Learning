@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
@@ -10,6 +9,11 @@ import {
   type IntegrationStatus,
   type NodeSummary,
 } from "../../lib/api";
+import Container from "../components/ui/Container";
+import PageHeader from "../components/ui/PageHeader";
+import Card from "../components/ui/Card";
+import Button from "../components/ui/Button";
+import Badge, { type BadgeTone } from "../components/ui/Badge";
 
 /**
  * Review authoring (M5) — antrean artifact Claude Code menunggu keputusan Isyah.
@@ -107,15 +111,11 @@ export default function AuthoringPage() {
   };
 
   return (
-    <main style={{ maxWidth: 980, margin: "0 auto" }}>
-      <p>
-        <Link href="/">← Dashboard</Link>
-      </p>
-      <h1 style={{ marginBottom: 4 }}>Authoring · review artifact Claude Code</h1>
-      <p style={{ color: "#57606a", marginTop: 0 }}>
-        AI mengUSULkan; kamu yang memutuskan. Tak ada artifact yang masuk sistem tanpa
-        Approve di halaman ini.
-      </p>
+    <Container wide>
+      <PageHeader
+        title="Authoring · review artifact Claude Code"
+        subtitle="AI mengUSULkan; kamu yang memutuskan. Tak ada artifact yang masuk sistem tanpa Approve di halaman ini."
+      />
 
       {status && <StatusBar status={status} />}
       {note && <Banner tone="ok">{note}</Banner>}
@@ -123,12 +123,12 @@ export default function AuthoringPage() {
 
       <TriggerPanel nodes={nodes} disabled={!status?.enabled} onTrigger={trigger} />
 
-      <h2 style={{ marginTop: 28 }}>Antrean</h2>
-      {!jobs && <p>Memuat…</p>}
+      <h2 className="mt-8 text-lg font-semibold">Antrean</h2>
+      {!jobs && <p className="mt-2 text-muted">Memuat…</p>}
       {jobs?.length === 0 && (
-        <p style={{ color: "#57606a" }}>Belum ada job. Picu satu peran di atas.</p>
+        <p className="mt-2 text-muted">Belum ada job. Picu satu peran di atas.</p>
       )}
-      <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 8 }}>
+      <ul className="mt-3 grid gap-2">
         {jobs?.map((job) => (
           <li key={job.id}>
             <JobRow job={job} onOpen={() => open(job.id)} />
@@ -146,25 +146,16 @@ export default function AuthoringPage() {
       )}
 
       <HypothesisTable rows={hypotheses} />
-    </main>
+    </Container>
   );
 }
 
 function StatusBar({ status }: { status: IntegrationStatus }) {
   return (
-    <div
-      style={{
-        border: "1px solid #d0d7de",
-        borderRadius: 8,
-        padding: "0.7rem 1rem",
-        fontSize: 13,
-        display: "grid",
-        gap: 4,
-      }}
-    >
+    <Card className="grid gap-1 p-4 text-[13px]">
       <div>
         Integrasi:{" "}
-        <strong style={{ color: status.enabled ? "#1a7f37" : "#cf222e" }}>
+        <strong className={status.enabled ? "text-success" : "text-danger"}>
           {status.enabled ? "aktif" : "dimatikan"}
         </strong>{" "}
         · CLI {status.cli_available ? "terdeteksi" : "tidak ditemukan"} ·{" "}
@@ -172,10 +163,10 @@ function StatusBar({ status }: { status: IntegrationStatus }) {
           .map(([k, v]) => `${k}: ${v}`)
           .join(" · ") || "belum ada job"}
       </div>
-      <div style={{ color: "#57606a" }}>
+      <div className="text-muted">
         Yang tak pernah dilakukan AI di sini: {status.never_does.join(" · ")}.
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -192,77 +183,103 @@ function TriggerPanel({
   const [repoPath, setRepoPath] = useState("");
   const node = nodeId || nodes[0]?.id || "";
 
+  const inputCls =
+    "rounded-md border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none";
+
   return (
-    <section style={{ marginTop: 20, display: "grid", gap: 10 }}>
-      <h2 style={{ margin: 0 }}>Picu peran</h2>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <select value={node} onChange={(e) => setNodeId(e.target.value)} style={{ padding: 6 }}>
-          {nodes.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.id} · {n.concept}
-            </option>
-          ))}
-        </select>
-        <button disabled={disabled || !node} onClick={() => onTrigger(() => api.triggerR3({ node_id: node }))}>
-          R3 · materi just-in-time
-        </button>
-        <button disabled={disabled || !node} onClick={() => onTrigger(() => api.triggerR4({ node_id: node }))}>
-          R4 · varian soal baru
-        </button>
-      </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <input
-          placeholder="path repo untuk R2 (mis. C:\\project\\repo-bryant)"
-          value={repoPath}
-          onChange={(e) => setRepoPath(e.target.value)}
-          style={{ padding: 6, minWidth: 340 }}
-        />
-        <button
-          disabled={disabled || !repoPath}
-          onClick={() => onTrigger(() => api.triggerR2({ repo_path: repoPath }))}
-        >
-          R2 · bukti codebase (jadi hipotesis)
-        </button>
-      </div>
-      <p style={{ color: "#57606a", fontSize: 13, margin: 0 }}>
-        R3 hanya bisa dipicu untuk node yang <strong>punya attempt gagal</strong> — materi
-        lahir dari kegagalan nyata, bukan dibaca lebih dulu.
-      </p>
+    <section className="mt-6">
+      <h2 className="text-lg font-semibold">Picu peran</h2>
+
+      <Card className="mt-3 grid gap-4 p-4">
+        {/* R3 / R4 — per node */}
+        <div className="grid gap-2">
+          <label className="text-xs font-medium uppercase tracking-wide text-muted">
+            Node sasaran (R3 · R4)
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={node}
+              onChange={(e) => setNodeId(e.target.value)}
+              className={`${inputCls} min-w-[280px] flex-1`}
+            >
+              {nodes.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.id} · {n.concept}
+                </option>
+              ))}
+            </select>
+            <Button
+              variant="secondary"
+              disabled={disabled || !node}
+              onClick={() => onTrigger(() => api.triggerR3({ node_id: node }))}
+            >
+              R3 · materi just-in-time
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={disabled || !node}
+              onClick={() => onTrigger(() => api.triggerR4({ node_id: node }))}
+            >
+              R4 · varian soal baru
+            </Button>
+          </div>
+          <p className="text-[13px] text-muted">
+            R3 hanya bisa dipicu untuk node yang{" "}
+            <strong className="font-semibold text-fg">punya attempt gagal</strong> — materi
+            lahir dari kegagalan nyata, bukan dibaca lebih dulu.
+          </p>
+        </div>
+
+        {/* R2 — dari repo */}
+        <div className="grid gap-2 border-t border-border-muted pt-4">
+          <label className="text-xs font-medium uppercase tracking-wide text-muted">
+            Repo untuk bukti codebase (R2)
+          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              placeholder="path repo untuk R2 (mis. C:\project\repo-bryant)"
+              value={repoPath}
+              onChange={(e) => setRepoPath(e.target.value)}
+              className={`${inputCls} min-w-[340px] flex-1`}
+            />
+            <Button
+              variant="secondary"
+              disabled={disabled || !repoPath}
+              onClick={() => onTrigger(() => api.triggerR2({ repo_path: repoPath }))}
+            >
+              R2 · bukti codebase (jadi hipotesis)
+            </Button>
+          </div>
+        </div>
+      </Card>
     </section>
   );
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: "#57606a",
-  running: "#0969da",
-  ready: "#1a7f37",
-  failed: "#cf222e",
-  approved: "#8250df",
-  rejected: "#9a6700",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  pending: "neutral",
+  running: "info",
+  ready: "success",
+  failed: "danger",
+  approved: "info",
+  rejected: "warning",
 };
 
 function JobRow({ job, onOpen }: { job: AuthoringJob; onOpen: () => void }) {
   return (
-    <button
-      onClick={onOpen}
-      style={{
-        width: "100%",
-        textAlign: "left",
-        padding: "0.6rem 0.9rem",
-        display: "grid",
-        gap: 2,
-      }}
-    >
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <strong style={{ textTransform: "uppercase" }}>{job.role}</strong>
-        <span style={{ color: STATUS_COLOR[job.status], fontWeight: 600 }}>{job.status}</span>
-        <span style={{ fontFamily: "monospace", fontSize: 12, color: "#57606a" }}>{job.id}</span>
-      </div>
-      <div style={{ fontSize: 13, color: "#57606a" }}>
-        {String(job.request.node_id ?? job.request.repo_path ?? "")}
-        {job.gate && !job.gate.passed && ` · gate: ${job.gate.reason}`}
-        {job.error && ` · ${job.error}`}
-      </div>
+    <button onClick={onOpen} className="w-full text-left">
+      <Card className="grid gap-1.5 p-3.5 transition-shadow hover:shadow-md">
+        <div className="flex items-center gap-2">
+          <strong className="uppercase">{job.role}</strong>
+          <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>{job.status}</Badge>
+          <span className="font-mono text-xs text-subtle">{job.id}</span>
+        </div>
+        <div className="text-[13px] text-muted">
+          {String(job.request.node_id ?? job.request.repo_path ?? "")}
+          {job.gate && !job.gate.passed && ` · gate: ${job.gate.reason}`}
+          {job.error && ` · ${job.error}`}
+        </div>
+      </Card>
     </button>
   );
 }
@@ -280,82 +297,70 @@ function JobPanel({
 }) {
   const reviewable = job.status === "ready";
   return (
-    <section
-      style={{
-        marginTop: 20,
-        border: "1px solid #d0d7de",
-        borderRadius: 8,
-        padding: "1rem 1.25rem",
-      }}
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ margin: 0 }}>
-          {job.role.toUpperCase()} · <span style={{ color: STATUS_COLOR[job.status] }}>{job.status}</span>
+    <Card className="mt-6 p-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          {job.role.toUpperCase()}
+          <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>{job.status}</Badge>
         </h2>
-        <button onClick={onClose}>tutup</button>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          tutup
+        </Button>
       </div>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#57606a" }}>
+      <div className="mt-1 font-mono text-xs text-subtle">
         {job.id} · prompt {job.prompt_version} · percobaan {job.attempts}
       </div>
 
       {job.gate && (
-        <p style={{ color: job.gate.passed ? "#1a7f37" : "#cf222e", fontSize: 13 }}>
+        <p className={`mt-2 text-[13px] ${job.gate.passed ? "text-success" : "text-danger"}`}>
           Gate otomatis: {job.gate.reason}
         </p>
       )}
       {job.error && <Banner tone="bad">{job.error}</Banner>}
 
       {Object.entries(job.existing).length > 0 && (
-        <details style={{ marginTop: 8 }}>
-          <summary>Yang sudah ada di data/ (pembanding)</summary>
+        <details className="mt-3">
+          <summary className="cursor-pointer font-medium">
+            Yang sudah ada di data/ (pembanding)
+          </summary>
           {Object.entries(job.existing).map(([name, content]) => (
             <FileBlock key={name} name={name} content={content} />
           ))}
         </details>
       )}
 
-      <h3 style={{ marginBottom: 4 }}>Artifact</h3>
+      <h3 className="mb-1 mt-4 font-semibold">Artifact</h3>
       {Object.entries(job.files).map(([name, content]) => (
         <FileBlock key={name} name={name} content={content} />
       ))}
 
-      <details style={{ marginTop: 8 }}>
-        <summary>Prompt yang dikirim</summary>
+      <details className="mt-3">
+        <summary className="cursor-pointer font-medium">Prompt yang dikirim</summary>
         <FileBlock name="prompt.md" content={job.prompt} />
       </details>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-        <button
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          variant="primary"
           onClick={onApprove}
           disabled={!reviewable}
           title={reviewable ? "" : "hanya job `ready` yang bisa masuk sistem"}
-          style={{ padding: "0.5rem 1rem", fontWeight: 600 }}
         >
           Approve → promosikan ke data/
-        </button>
-        <button onClick={onReject} disabled={job.status === "approved"} style={{ padding: "0.5rem 1rem" }}>
+        </Button>
+        <Button variant="danger" onClick={onReject} disabled={job.status === "approved"}>
           Tolak
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }
 
 function FileBlock({ name, content }: { name: string; content: string }) {
   return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#57606a" }}>{name}</div>
-      <pre
-        style={{
-          background: "#0d1117",
-          color: "#e6edf3",
-          padding: "0.7rem 0.9rem",
-          borderRadius: 8,
-          overflowX: "auto",
-          fontSize: 12.5,
-          maxHeight: 320,
-        }}
-      >
+    <div className="mt-2">
+      <div className="font-mono text-xs text-subtle">{name}</div>
+      <pre className="mt-1 max-h-[320px] overflow-x-auto rounded-md bg-code-bg p-3.5 text-[12.5px] text-code-fg">
         {content}
       </pre>
     </div>
@@ -371,35 +376,35 @@ const HYPOTHESIS_LABEL: Record<string, string> = {
 function HypothesisTable({ rows }: { rows: Hypothesis[] }) {
   if (rows.length === 0) return null;
   return (
-    <section style={{ marginTop: 28 }}>
-      <h2 style={{ marginBottom: 4 }}>Hipotesis codebase (R2)</h2>
-      <p style={{ color: "#57606a", marginTop: 0, fontSize: 13 }}>
-        Hipotesis <strong>tidak pernah</strong> jadi verdict: berapa pun confidence-nya,
-        statusnya hanya berubah lewat attempt reproduksi. Ia boleh mengusulkan urutan,
-        tak boleh menyatakan mastery.
+    <section className="mt-10">
+      <h2 className="text-lg font-semibold">Hipotesis codebase (R2)</h2>
+      <p className="mt-0.5 text-[13px] text-muted">
+        Hipotesis <strong className="font-semibold text-fg">tidak pernah</strong> jadi
+        verdict: berapa pun confidence-nya, statusnya hanya berubah lewat attempt
+        reproduksi. Ia boleh mengusulkan urutan, tak boleh menyatakan mastery.
       </p>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #d0d7de" }}>
-            <th style={{ padding: "6px 4px" }}>node</th>
-            <th style={{ padding: "6px 4px" }}>conf.</th>
-            <th style={{ padding: "6px 4px" }}>status</th>
-            <th style={{ padding: "6px 4px" }}>bukti</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((h) => (
-            <tr key={h.id} style={{ borderBottom: "1px solid #eaeef2" }}>
-              <td style={{ padding: "6px 4px", fontFamily: "monospace" }}>{h.node_id}</td>
-              <td style={{ padding: "6px 4px" }}>{h.confidence.toFixed(2)}</td>
-              <td style={{ padding: "6px 4px" }}>{HYPOTHESIS_LABEL[h.status] ?? h.status}</td>
-              <td style={{ padding: "6px 4px", fontFamily: "monospace", fontSize: 12 }}>
-                {h.evidence_locator}
-              </td>
+      <Card className="mt-3 overflow-x-auto">
+        <table className="w-full border-collapse text-[13px]">
+          <thead>
+            <tr className="border-b border-border text-left text-muted">
+              <th className="px-3 py-2 font-medium">node</th>
+              <th className="px-3 py-2 font-medium">conf.</th>
+              <th className="px-3 py-2 font-medium">status</th>
+              <th className="px-3 py-2 font-medium">bukti</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((h) => (
+              <tr key={h.id} className="border-b border-border-muted last:border-0">
+                <td className="px-3 py-2 font-mono">{h.node_id}</td>
+                <td className="px-3 py-2 tabular-nums">{h.confidence.toFixed(2)}</td>
+                <td className="px-3 py-2">{HYPOTHESIS_LABEL[h.status] ?? h.status}</td>
+                <td className="px-3 py-2 font-mono text-xs">{h.evidence_locator}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </section>
   );
 }
@@ -407,14 +412,9 @@ function HypothesisTable({ rows }: { rows: Hypothesis[] }) {
 function Banner({ tone, children }: { tone: "ok" | "bad"; children: React.ReactNode }) {
   return (
     <p
-      style={{
-        marginTop: 12,
-        padding: "0.6rem 0.9rem",
-        borderRadius: 8,
-        background: tone === "ok" ? "#dafbe1" : "#ffebe9",
-        border: `1px solid ${tone === "ok" ? "#1a7f37" : "#cf222e"}`,
-        fontSize: 13,
-      }}
+      className={`mt-3 rounded-md border px-4 py-2.5 text-[13px] ${
+        tone === "ok" ? "border-success bg-success-bg text-success" : "border-danger bg-danger-bg text-danger"
+      }`}
     >
       {children}
     </p>

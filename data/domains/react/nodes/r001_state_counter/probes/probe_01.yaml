@@ -1,0 +1,10 @@
+id: r001_probe_01
+node_id: r001_state_counter
+type: predict_output
+question: "Handler ditulis `onClick={setCount(count + 1)}` (tanpa arrow function). Apa yang terjadi saat komponen di-render?"
+options:
+  - "setCount dipanggil saat render, memicu render ulang tanpa henti"
+  - "Tidak terjadi apa-apa sampai tombol diklik"
+  - "React menunda pemanggilan sampai klik pertama"
+  - "Terjadi error sintaks saat kompilasi JSX"
+correct_answer: "setCount dipanggil saat render, memicu render ulang tanpa henti"

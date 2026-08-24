@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from sqlmodel import Session, select
 
 from app.config import PLACEMENT_MAX_NODES
+from app.graders.files import editor_language
 from app.models import Attempt, Node
 from app.models import Session as SessionRow
 from app.services.mastery import Outcome, apply_outcome, unlock
@@ -49,6 +50,8 @@ class PlacementChallenge:
     signature_contract: str
     timebox_seconds: int
     position: int  # urutan ke-berapa dalam sesi (1-based)
+    # Mode highlight editor, diturunkan dari berkas instance (lihat graders/files).
+    language: str = "plaintext"
 
 
 @dataclass
@@ -104,6 +107,7 @@ def _challenge_for(session: Session, node_id: str, position: int) -> PlacementCh
         signature_contract=instance.signature_contract,
         timebox_seconds=node.timebox_seconds,
         position=position,
+        language=editor_language(instance),
     )
 
 

@@ -64,6 +64,21 @@ MIN_VARIANTS_FOR_REVIEW = 3
 # Keduanya beda dan tak boleh disatukan.
 EXECUTION_TIMEOUT_SECONDS = 10
 
+# --------------------------------------------------------------------------- #
+# Domain kedua (M6) — React & ML. Menambah domain = menambah grader, TITIK:
+# tak ada kolom DB baru, tak ada cabang per-domain di loop/scaffold/scheduler.
+# --------------------------------------------------------------------------- #
+# Runtime eksekusi hidden test React (Node + vitest + jsdom). Dependency ter-pin di
+# `runtime/react/package.json` — analog venv ter-pin di sisi Python.
+REACT_RUNTIME_DIR = REPO_ROOT / "runtime" / "react"
+
+# Timeout eksekusi React JAUH lebih besar dari Python bukan karena kodenya lebih
+# lambat, tapi karena start-up-nya: vitest harus menyalakan jsdom + mentransform JSX
+# (~50 detik saat dingin, ~7 detik saat panas). Menyamakannya dengan 10s Python akan
+# membuat submisi BENAR ter-grade FAIL — kegagalan terburuk yang bisa dipunyai
+# sistem yang seluruh kepercayaannya bersandar pada sinyal pass/fail.
+REACT_EXECUTION_TIMEOUT_SECONDS = 120
+
 # Origin frontend Next.js untuk CORS (dev).
 FRONTEND_ORIGIN = "http://localhost:3000"
 

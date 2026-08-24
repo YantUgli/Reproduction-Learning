@@ -14,17 +14,25 @@ export default function SandboxEditor({
   onChange,
   readOnly = false,
   height = "340px",
+  language = "plaintext",
 }: {
   value: string;
   onChange?: (v: string) => void;
   readOnly?: boolean;
   height?: string;
+  /** Mode highlight dari backend (diturunkan dari berkas node, bukan dari domain). */
+  language?: string;
 }) {
+  // Hint muncul hanya saat editor benar-benar kosong & bisa diedit — bukan placeholder
+  // yang menyarankan solusi (§2), cuma pengingat aturan main. pointer-events-none supaya
+  // klik tetap sampai ke Monaco.
+  const showHint = !readOnly && value.trim() === "";
+
   return (
-    <div style={{ border: "1px solid #d0d7de", borderRadius: 6, overflow: "hidden" }}>
+    <div className="relative overflow-hidden rounded-md border border-border">
       <Editor
         height={height}
-        language="python"
+        language={language}
         value={value}
         onChange={(v) => onChange?.(v ?? "")}
         options={{
@@ -45,6 +53,11 @@ export default function SandboxEditor({
           suggest: { showWords: false },
         }}
       />
+      {showHint && (
+        <div className="pointer-events-none absolute left-[62px] top-[9px] select-none font-mono text-sm text-subtle">
+          Tulis dari nol — tanpa contoh, tanpa AI.
+        </div>
+      )}
     </div>
   );
 }

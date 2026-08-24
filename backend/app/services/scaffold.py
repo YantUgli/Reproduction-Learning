@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from sqlmodel import Session, select
 
 from app.config import MIN_VARIANTS_FOR_REVIEW
-from app.graders.unit_test import reference_solution_path
+from app.graders.files import editor_language, reference_solution_path
 from app.models import Attempt, ChallengeInstance, ComprehensionProbe, Node
 
 LEVELS = ["L3", "L2", "L1", "L0"]
@@ -34,6 +34,9 @@ class LevelView:
     editable: bool
     show_timebox: bool
     timebox_seconds: int
+    # Mode highlight editor sandbox, DITURUNKAN dari berkas instance (bukan dari
+    # `domain_id`) — lihat `graders/files.editor_language`.
+    language: str = "plaintext"
 
 
 def _instances(session: Session, node_id: str) -> list[ChallengeInstance]:
@@ -144,6 +147,7 @@ def build_level_view(session: Session, node: Node, level: str) -> LevelView:
             editable=False,
             show_timebox=False,
             timebox_seconds=node.timebox_seconds,
+            language=editor_language(teaching),
         )
 
     if level == "L2":
@@ -158,6 +162,7 @@ def build_level_view(session: Session, node: Node, level: str) -> LevelView:
             editable=True,
             show_timebox=False,
             timebox_seconds=node.timebox_seconds,
+            language=editor_language(teaching),
         )
 
     if level == "L1":
@@ -172,6 +177,7 @@ def build_level_view(session: Session, node: Node, level: str) -> LevelView:
             editable=True,
             show_timebox=False,
             timebox_seconds=node.timebox_seconds,
+            language=editor_language(teaching),
         )
 
     # L0 — verifikasi pada varian berbeda, timebox jalan.
@@ -187,4 +193,5 @@ def build_level_view(session: Session, node: Node, level: str) -> LevelView:
         editable=True,
         show_timebox=True,
         timebox_seconds=node.timebox_seconds,
+        language=editor_language(verify),
     )

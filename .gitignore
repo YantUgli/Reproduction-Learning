@@ -26,3 +26,6 @@ artifacts/*
 .DS_Store
 Thumbs.db
 *.swp
+
+# Direktori kerja grading React (M6) — dibuat & dihapus per grading.
+runtime/react/.work/

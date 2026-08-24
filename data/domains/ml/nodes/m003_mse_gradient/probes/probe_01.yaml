@@ -1,0 +1,10 @@
+id: m003_probe_01
+node_id: m003_mse_gradient
+type: trace
+question: "Loss = mean((X@w + b - y)^2) dengan n baris data. Bentuk dw yang benar adalah?"
+options:
+  - "(2/n) * X.T @ (X@w + b - y)"
+  - "(1/n) * X.T @ (y - X@w - b)"
+  - "2 * X @ (X@w + b - y)"
+  - "(2/n) * X @ (X.T @ w - y)"
+correct_answer: "(2/n) * X.T @ (X@w + b - y)"

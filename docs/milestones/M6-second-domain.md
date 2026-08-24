@@ -108,11 +108,43 @@ untuk satu node ML `value_assert`.
 
 ## Acceptance criteria
 
-- [ ] Grader `dom_behavior` & `value_assert` terpasang di balik interface yang sama;
-      `structural` opsional bila ada node arsitektur.
-- [ ] Minimal beberapa node React & ML lengkap, hidden test hijau di solusi referensi.
-- [ ] Loop/scaffold/scheduler/mastery **tidak diubah** untuk mendukung domain baru
-      (buktikan: tak ada cabang per-domain di kode loop).
-- [ ] ML memakai `value_assert` pada komponen kecil; `metric_threshold` tidak jadi
-      grader utama.
-- [ ] Skema data tetap domain-agnostic (tidak ada kolom khusus React/ML).
+- [x] Grader `dom_behavior` & `value_assert` terpasang di balik interface yang sama.
+      Keduanya memakai `Grader` Protocol yang sama dan mendelegasikan ke `Executor`;
+      `NodeExecutor` (Node+vitest+jsdom) memenuhi Protocol yang sama dengan
+      `SubprocessExecutor` — diuji lewat `isinstance` di `test_grader_dom_behavior.py`.
+      **`structural` sengaja TIDAK dibuat**: belum ada node arsitektur, dan grader
+      tanpa node adalah kode yang tak pernah dijalankan.
+- [x] Node React & ML lengkap, hidden test hijau di solusi referensi.
+      3 node React (`r001`–`r003`) + 3 node ML (`m001`–`m003`), masing-masing 2 varian
+      & 1 probe. `verify_nodes.py` → **39/39 instance hijau** lintas 3 domain, dan
+      seluruh `starter_code` terbukti GAGAL (tantangannya tidak kosong).
+- [x] Loop/scaffold/scheduler/mastery **tidak diubah** untuk mendukung domain baru.
+      `test_domain_agnostic_loop.py` membuktikannya dua lapis: node React & ML bergerak
+      lewat `submit_attempt`/`answer_probe`/`apply_outcome` yang sama sampai `acquired`
+      & `mastered`, DAN 10 modul loop diperiksa tak punya cabang atas
+      `domain_id`/`grader_type` (test merah kalau ada yang menambahkannya).
+- [x] ML memakai `value_assert` pada komponen kecil; `metric_threshold` **tidak
+      terdaftar sama sekali** di registry. Toleransi eksplisit per node
+      (`expected.json` → `rtol`/`atol`), diuji: angka yang sama lolos dengan `rtol`
+      longgar dan gagal dengan `rtol` ketat.
+- [x] Skema data tetap domain-agnostic — **nol kolom baru**. Yang berbeda antar domain
+      hidup di `grader_type` + isi `data/` (termasuk toleransi ML dan ekstensi berkas).
+
+## Yang ikut diperbaiki (kebocoran abstraksi yang baru terlihat saat domain kedua ada)
+
+M6 §Keputusan: "kalau menambah domain butuh menyentuh loop, itu abstraksi bocor —
+perbaiki interface". Tiga kebocoran ditemukan & ditutup, semuanya di lapisan
+authoring/IO, bukan di loop:
+
+1. **`node_loader` mengunci ekstensi `.py`.** Berkas instance kini dikenali dari nama
+   dasar (`reference_solution.*`), jadi `.jsx` masuk tanpa perlakuan khusus.
+2. **`verify_nodes.py` punya salinan aturan eksekusinya sendiri** (langsung memanggil
+   `SubprocessExecutor`). Sekarang ia memakai `get_grader(node.grader_type)` — gerbang
+   authoring memverifikasi persis yang dinilai saat Bryant submit.
+3. **`load_domain_into_db` menghapus SELURUH tabel Edge tiap muat.** Benar untuk satu
+   domain; begitu domain kedua dimuat ia menghapus edge domain pertama dan membuka
+   node yang seharusnya terkunci. Kini hanya edge milik domain itu yang di-reset.
+
+Ditambah satu perbaikan UI yang lahir dari domain kedua: editor sandbox tak lagi
+mengunci `language="python"` — bahasanya diturunkan dari **berkas node** (bukan dari
+`domain_id`), jadi node React dapat highlight JavaScript tanpa cabang per-domain.
