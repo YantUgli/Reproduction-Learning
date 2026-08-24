@@ -29,7 +29,7 @@ export default function TestOutput({
           <span className="font-normal text-muted">(timeout eksekusi)</span>
         )}
       </div>
-      <pre className="max-h-[260px] overflow-x-auto rounded-md bg-code-bg p-4 text-[13px] leading-relaxed text-code-fg">
+      <pre className="max-h-[260px] overflow-x-auto rounded-md bg-code-bg p-4 text-13 leading-relaxed text-code-fg">
         {output || "(tanpa output)"}
       </pre>
     </div>

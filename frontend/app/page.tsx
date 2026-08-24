@@ -7,6 +7,8 @@ import StatusBadge from "./components/StatusBadge";
 import Card from "./components/ui/Card";
 import Container from "./components/ui/Container";
 import EmptyState from "./components/ui/EmptyState";
+import ErrorState from "./components/ui/ErrorState";
+import { KpiRowSkeleton } from "./components/ui/Skeleton";
 import { IconArrowRight, IconInbox, IconLock } from "./components/ui/Icon";
 
 /**
@@ -22,14 +24,17 @@ export default function Dashboard() {
   const [due, setDue] = useState<DueItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
+    setError(null);
     Promise.all([api.getStats(), api.listDue()])
       .then(([s, d]) => {
         setStats(s);
         setDue(d);
       })
       .catch((e) => setError(String(e)));
-  }, []);
+  };
+
+  useEffect(load, []);
 
   return (
     <Container>
@@ -41,12 +46,8 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {error && (
-        <p className="rounded-md border border-danger bg-danger-bg px-4 py-3 text-danger">
-          Gagal memuat: {error}
-        </p>
-      )}
-      {!stats && !error && <p className="text-muted">Memuat…</p>}
+      {error && <ErrorState error={error} onRetry={load} />}
+      {!stats && !error && <KpiRowSkeleton />}
 
       {stats && (
         <>
@@ -130,7 +131,7 @@ function DueSection({ due }: { due: DueItem[] }) {
                 <Card className="flex items-center justify-between gap-3 border-l-4 border-l-warning p-3 transition-shadow hover:shadow-md">
                   <div>
                     <div className="font-semibold">{d.concept}</div>
-                    <div className="text-[13px] text-muted">
+                    <div className="text-13 text-muted">
                       telat {d.overdue_days.toFixed(1)} hari · sukses berjarak{" "}
                       {d.consecutive_success}/{d.successes_needed}
                     </div>
@@ -165,11 +166,18 @@ function ProgressMap({ stats }: { stats: Stats }) {
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(n);
   }
 
+  // "Berikutnya" = node tersedia pertama yang belum tersentuh. Sistem sudah tahu ke
+  // mana user harus melangkah; sebelumnya tak ada satu pun afordansi yang menunjukkannya.
+  const nextNode =
+    stats.nodes.find((n) => n.status === "available" && n.attempts === 0)?.node_id ??
+    stats.nodes.find((n) => n.status === "available")?.node_id ??
+    null;
+
   return (
     <section className="mt-10">
       <h2 className="text-lg font-semibold">Peta progres</h2>
       {stats.placement_floor_node_id && (
-        <p className="mt-0.5 text-[13px] text-muted">
+        <p className="mt-0.5 text-13 text-muted">
           Lantai dari placement terakhir:{" "}
           <code className="font-mono">{stats.placement_floor_node_id}</code>
         </p>
@@ -181,10 +189,18 @@ function ProgressMap({ stats }: { stats: Stats }) {
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-subtle">
               {label}
             </h3>
-            <ol className="grid gap-2.5">
+            <ol className="grid gap-2">
               {groups.get(label)!.map((n) => (
                 <li key={n.node_id}>
-                  <NodeRow node={n} successesNeeded={stats.successes_needed} />
+                  {n.status === "locked" ? (
+                    <LockedRow node={n} />
+                  ) : (
+                    <NodeRow
+                      node={n}
+                      successesNeeded={stats.successes_needed}
+                      isNext={n.node_id === nextNode}
+                    />
+                  )}
                 </li>
               ))}
             </ol>
@@ -194,41 +210,73 @@ function ProgressMap({ stats }: { stats: Stats }) {
   );
 }
 
-function NodeRow({ node, successesNeeded }: { node: NodeStat; successesNeeded: number }) {
-  const locked = node.status === "locked";
-  const rate = node.pass_rate === null ? "belum diuji" : `${Math.round(node.pass_rate * 100)}%`;
-
-  const inner = (
-    <Card
-      className={`flex items-center justify-between gap-3 p-4 ${
-        locked ? "bg-surface-muted opacity-70" : "transition-shadow hover:shadow-md"
-      }`}
-    >
-      <div className="min-w-0">
-        <div className="font-mono text-xs text-subtle">{node.node_id}</div>
-        <div className="font-semibold">{node.concept}</div>
-        <div className="text-[13px] text-muted">
-          pass rate {rate}
-          {node.attempts > 0 && ` (${node.passed}/${node.attempts})`} · sukses berjarak{" "}
-          {node.consecutive_success}/{successesNeeded}
-          {node.due_at && ` · due ${new Date(node.due_at).toLocaleDateString()}`}
-        </div>
+/** Node terkunci: baris rapat satu-baris, bukan Card penuh. Menghemat berat visual
+ *  (mayoritas layar terkunci) & memberi penjelasan yang TERLIHAT, bukan tooltip hover
+ *  (yang tak terjangkau keyboard/sentuh). */
+function LockedRow({ node }: { node: NodeStat }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-md border border-border-muted bg-surface-muted px-4 py-2.5">
+      <IconLock className="shrink-0 text-fg-disabled" />
+      <div className="min-w-0 flex-1">
+        <span className="text-sm font-medium text-fg-disabled">{node.concept}</span>
+        <span className="ml-2 text-13 text-fg-disabled">
+          terkunci — selesaikan prasyaratnya dulu
+        </span>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {node.is_due && <span className="text-[13px] font-semibold text-warning">due</span>}
-        {locked && <IconLock className="text-subtle" />}
-        <StatusBadge status={node.status} />
-      </div>
-    </Card>
+    </div>
   );
+}
 
-  if (locked) {
-    return <div title="Terkunci sampai prasyarat (hard edge) terbukti">{inner}</div>;
-  }
+function NodeRow({
+  node,
+  successesNeeded,
+  isNext,
+}: {
+  node: NodeStat;
+  successesNeeded: number;
+  isNext: boolean;
+}) {
+  // Tampilkan metadata HANYA bila bermakna — jangan ulang "belum diuji · 0/4" 19×
+  // (noise yang menenggelamkan baris yang benar-benar punya progres).
+  const hasSignal = node.attempts > 0 || node.consecutive_success > 0 || node.is_due;
+  const rate = node.pass_rate === null ? null : `${Math.round(node.pass_rate * 100)}%`;
+
   const href = node.is_due ? `/review?node=${node.node_id}` : `/node/${node.node_id}`;
   return (
     <Link href={href} className="block">
-      {inner}
+      <Card
+        className={`flex items-center justify-between gap-3 p-4 transition-shadow hover:shadow-md ${
+          isNext ? "border-l-4 border-l-accent" : ""
+        }`}
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold">{node.concept}</span>
+            {isNext && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-info-bg px-2 py-0.5 text-xs font-semibold text-info">
+                Mulai di sini <IconArrowRight size={12} />
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 font-mono text-xs text-subtle">{node.node_id}</div>
+          {hasSignal && (
+            <div className="mt-0.5 text-13 text-muted">
+              {rate && (
+                <>
+                  pass rate {rate}
+                  {node.attempts > 0 && ` (${node.passed}/${node.attempts})`} ·{" "}
+                </>
+              )}
+              sukses berjarak {node.consecutive_success}/{successesNeeded}
+              {node.due_at && ` · due ${new Date(node.due_at).toLocaleDateString()}`}
+            </div>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {node.is_due && <span className="text-13 font-semibold text-warning">due</span>}
+          <StatusBadge status={node.status} />
+        </div>
+      </Card>
     </Link>
   );
 }

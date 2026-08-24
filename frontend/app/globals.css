@@ -17,7 +17,12 @@
 
   --fg: #1f2328;
   --muted: #57606a;
-  --subtle: #8c959f;
+  /* --subtle dinaikkan dari #8c959f (kontras 2.85 — GAGAL WCAG AA) ke #656d76,
+   * yang lulus AA (≥4.5) di canvas, surface, maupun neutral-bg. */
+  --subtle: #656d76;
+  /* Warna teks untuk elemen dinonaktifkan/terkunci. Menggantikan pola `opacity-70`
+   * yang meredam token & membuat kontras tak bisa diaudit (temuan aksesibilitas). */
+  --fg-disabled: #656d76;
 
   --accent: #0969da;
   --accent-hover: #0860ca;

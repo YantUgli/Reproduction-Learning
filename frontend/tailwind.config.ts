@@ -22,6 +22,7 @@ const config: Config = {
         fg: "var(--fg)",
         muted: "var(--muted)",
         subtle: "var(--subtle)",
+        "fg-disabled": "var(--fg-disabled)",
         accent: {
           DEFAULT: "var(--accent)",
           hover: "var(--accent-hover)",
@@ -34,6 +35,9 @@ const config: Config = {
         info: { DEFAULT: "var(--info)", bg: "var(--info-bg)" },
         code: { bg: "var(--code-bg)", fg: "var(--code-fg)" },
       },
+      // 13px dulu ditulis ad-hoc `text-[13px]` ~30 kali (di luar skala). Kini token
+      // bernama supaya jadi bagian skala tipografi, bukan escape hatch.
+      fontSize: { "13": ["13px", { lineHeight: "1.45" }] },
       borderRadius: { md: "8px", lg: "12px" },
       boxShadow: {
         sm: "0 1px 2px rgba(31,35,40,.06), 0 1px 1px rgba(31,35,40,.04)",

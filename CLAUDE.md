@@ -423,3 +423,19 @@ alasan · alternatif yang ditolak.
   murni frontend — tak ada perubahan backend/DB/skema. *Ditolak:* CSS murni (lebih
   selaras §11 tapi iterasi lebih lambat & tanpa ekosistem utility), component library
   (shadcn/MUI — paling berat, menarik banyak dependency, paling jauh dari §11).
+
+- **2026-08-24 · UI · Monaco di-self-host (dependency langsung `monaco-editor@0.55.1`),
+  bukan diunduh runtime dari cdn.jsdelivr.** Alasan: `@monaco-editor/react` default
+  memuat Monaco dari CDN publik saat runtime — melanggar klaim *local-first* (offline =
+  editor tak pernah muncul) dan membiarkan versi/perilaku editor ditentukan CDN, risiko
+  integritas untuk invariant §2 (jaminan "tanpa saran AI"). Kini di-bundle lokal via
+  `loader.config({ monaco })` + worker `editor.worker` lewat `new Worker(new URL(...))`.
+  Ter-code-split (First Load JS halaman tetap ~104 kB). *Ditolak:* tetap CDN (rapuh &
+  tak ter-pin), meng-eject seluruh worker Monaco (tak perlu — layanan bahasa dimatikan).
+
+- **2026-08-24 · UI · Token `--subtle` dinaikkan `#8c959f`→`#656d76` + pola `opacity-70`
+  untuk menandai disabled diganti token `--fg-disabled`.** Alasan: `#8c959f` gagal WCAG
+  AA (kontras 2.85 di canvas), dan `opacity-70` menumpuk di atasnya (turun ke ~2.0) untuk
+  mayoritas kartu terkunci — praktis tak terbaca. Token eksplisit lulus AA & bisa diaudit.
+  *Ditolak:* biarkan opacity (kontras tak terprediksi), turunkan target ke AA-large (teks
+  kecil butuh 4.5).

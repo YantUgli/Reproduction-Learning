@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { IconClock } from "./ui/Icon";
+import { IconStopwatch } from "./ui/Icon";
 
 /**
  * Hitung mundur timebox_seconds (§7.6 — bagian desain integritas, bukan hiasan).
@@ -56,11 +56,14 @@ export default function Timebox({
 
   return (
     <span
-      className={`inline-flex w-[84px] items-center justify-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold tabular-nums ${tone}`}
-      title="Timebox — batas waktu berpikir"
+      role="timer"
+      aria-live={danger ? "assertive" : "off"}
+      aria-label={`Sisa waktu ${m} menit ${s} detik. Saat habis, kode otomatis dikirim.`}
+      className={`inline-flex w-[104px] items-center justify-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold tabular-nums ${tone}`}
+      title="Timebox — batas waktu berpikir. Saat habis, kode otomatis dikirim & dinilai."
     >
-      <IconClock size={14} />
-      {m}:{String(s).padStart(2, "0")}
+      <IconStopwatch size={14} />
+      sisa {m}:{String(s).padStart(2, "0")}
     </span>
   );
 }

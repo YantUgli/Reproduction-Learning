@@ -16,9 +16,9 @@ import ProbeCard from "../components/ProbeCard";
 import StatusBadge from "../components/StatusBadge";
 import TestOutput from "../components/TestOutput";
 import Container from "../components/ui/Container";
-import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
 import EmptyState from "../components/ui/EmptyState";
+import ErrorState from "../components/ui/ErrorState";
 import { IconCheck, IconInbox } from "../components/ui/Icon";
 
 /**
@@ -106,9 +106,7 @@ function ReviewSession() {
   if (error) {
     return (
       <Shell>
-        <p className="rounded-md border border-danger bg-danger-bg px-4 py-3 text-danger">
-          Error: {error}
-        </p>
+        <ErrorState error={error} onRetry={() => location.reload()} />
       </Shell>
     );
   }
@@ -132,7 +130,7 @@ function ReviewSession() {
                 <button onClick={() => setNodeId(d.node_id)} className="w-full text-left">
                   <Card className="p-3.5 transition-shadow hover:shadow-md">
                     <div className="font-semibold">{d.concept}</div>
-                    <div className="text-[13px] text-muted">
+                    <div className="text-13 text-muted">
                       telat {d.overdue_days.toFixed(1)} hari · sukses berjarak{" "}
                       {d.consecutive_success}/{d.successes_needed}
                     </div>
@@ -165,7 +163,7 @@ function ReviewSession() {
         terakhir kamu kerjakan. Tanpa contoh, tanpa kerangka, tanpa AI — produksi dari nol.
       </p>
       {challenge.needs_more_variants && (
-        <p className="mt-2 rounded-md border border-warning bg-warning-bg px-4 py-2.5 text-[13px] text-warning">
+        <p className="mt-2 rounded-md border border-warning bg-warning-bg px-4 py-2.5 text-13 text-warning">
           Varian node ini menipis — rotasi akan mulai berulang. Itu sinyal untuk
           mengarang varian baru (authoring), bukan alasan berhenti review.
         </p>
@@ -217,14 +215,14 @@ function OutcomePanel({ outcome }: { outcome: Outcome }) {
           <strong className="text-danger">Lapsed — interval direset</strong>
         )}
       </div>
-      <p className="mt-2 text-[13px] text-muted">
+      <p className="mt-2 text-13 text-muted">
         Rating FSRS: <code className="font-mono">{outcome.rating}</code>
         {outcome.interval_days !== null && (
           <> · jadwal berikutnya ~{outcome.interval_days.toFixed(1)} hari lagi</>
         )}
         {outcome.due_at && <> ({new Date(outcome.due_at).toLocaleDateString()})</>}
       </p>
-      <p className="mt-1 text-[13px] text-muted">
+      <p className="mt-1 text-13 text-muted">
         Sukses berjarak {outcome.consecutive_success}/{outcome.successes_needed} menuju{" "}
         <code className="font-mono">mastered</code>
         {!outcome.spaced && " · attempt ini belum jatuh tempo, jadi tidak dihitung"}

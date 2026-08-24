@@ -48,7 +48,7 @@ function renderBlocks(src: string): ReactNode[] {
       blocks.push(
         <pre
           key={key++}
-          className="my-2 overflow-x-auto rounded-md bg-code-bg p-4 text-[13px] text-code-fg"
+          className="my-2 overflow-x-auto rounded-md bg-code-bg p-4 text-13 text-code-fg"
         >
           {buf.join("\n")}
         </pre>,
@@ -60,7 +60,9 @@ function renderBlocks(src: string): ReactNode[] {
     const heading = /^(#{1,6})\s+(.*)$/.exec(line);
     if (heading) {
       const depth = heading[1].length;
-      const Tag = `h${Math.min(depth + 1, 6)}` as "h2" | "h3" | "h4" | "h5" | "h6";
+      // Offset +2: `#` prompt jadi <h3>, tidak bersaing dengan <h2> judul level di
+      // halaman (menjaga urutan heading H1→H2→H3, bukan H2 ganda).
+      const Tag = `h${Math.min(depth + 2, 6)}` as "h3" | "h4" | "h5" | "h6";
       blocks.push(
         <Tag key={key++} className="mb-1 mt-3 text-lg font-semibold leading-snug first:mt-0">
           {renderInline(heading[2])}
@@ -74,9 +76,22 @@ function renderBlocks(src: string): ReactNode[] {
     if (/^\s*[-*]\s+/.test(line)) {
       const items: ReactNode[] = [];
       while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
-        const text = lines[i].replace(/^\s*[-*]\s+/, "");
-        items.push(<li key={items.length}>{renderInline(text)}</li>);
+        const parts = [lines[i].replace(/^\s*[-*]\s+/, "")];
         i++;
+        // Lazy continuation: baris berikutnya yang BUKAN butir/heading/fence/kosong
+        // adalah lanjutan butir ini. Tanpa ini, syarat soal yang membungkus ke baris
+        // baru terlepas dari bulletnya (merusak teks spesifikasi tugas).
+        while (
+          i < lines.length &&
+          lines[i].trim() !== "" &&
+          !/^\s*[-*]\s+/.test(lines[i]) &&
+          !/^#{1,6}\s+/.test(lines[i]) &&
+          !lines[i].trim().startsWith("```")
+        ) {
+          parts.push(lines[i].trim());
+          i++;
+        }
+        items.push(<li key={items.length}>{renderInline(parts.join(" "))}</li>);
       }
       blocks.push(
         <ul key={key++} className="my-2 list-disc space-y-1 pl-6">

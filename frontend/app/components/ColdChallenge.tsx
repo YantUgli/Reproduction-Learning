@@ -57,7 +57,10 @@ export default function ColdChallenge({
 
   return (
     <div className="mt-4">
-      <div className="mb-2 flex justify-end">
+      <div className="mb-2 flex items-center justify-end gap-2">
+        <span className="text-13 text-muted">
+          Saat waktu habis, kode otomatis dikirim &amp; dinilai.
+        </span>
         <Timebox
           key={challengeKey}
           seconds={timeboxSeconds}
@@ -71,7 +74,7 @@ export default function ColdChallenge({
       </div>
 
       {signatureContract && (
-        <p className="mt-2 font-mono text-[13px] text-muted">
+        <p className="mt-2 font-mono text-13 text-muted">
           contract: {signatureContract}
         </p>
       )}
@@ -84,6 +87,7 @@ export default function ColdChallenge({
             setCode(v);
             codeRef.current = v;
           }}
+          onSubmit={submitting ? undefined : () => submit(false)}
         />
       </div>
 

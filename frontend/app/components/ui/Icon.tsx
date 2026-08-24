@@ -39,6 +39,21 @@ export function IconCheck({ className, size = 16 }: IconProps) {
   return svg(<path d="M20 6 9 17l-5-5" />, size, className);
 }
 
+/** Stopwatch — untuk timebox (hitung mundur), sengaja BUKAN jam dinding supaya
+ * `17:53` tak terbaca sebagai "pukul 17:53". */
+export function IconStopwatch({ className, size = 14 }: IconProps) {
+  return svg(
+    <>
+      <path d="M9 2h6" />
+      <path d="M12 2v2" />
+      <circle cx="12" cy="14" r="8" />
+      <path d="M12 14V10" />
+    </>,
+    size,
+    className,
+  );
+}
+
 export function IconX({ className, size = 16 }: IconProps) {
   return svg(<path d="M18 6 6 18M6 6l12 12" />, size, className);
 }

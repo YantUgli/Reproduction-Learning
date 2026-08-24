@@ -19,6 +19,8 @@ import TestOutput from "../../components/TestOutput";
 import Container from "../../components/ui/Container";
 import Button from "../../components/ui/Button";
 import { IconArrowRight, IconCheck } from "../../components/ui/Icon";
+import ErrorState from "../../components/ui/ErrorState";
+import { EditorSkeleton } from "../../components/ui/Skeleton";
 
 // Monaco butuh window → jangan SSR.
 const SandboxEditor = dynamic(() => import("../../components/SandboxEditor"), {
@@ -77,9 +79,33 @@ export default function NodeSession({ params }: { params: { id: string } }) {
     codeRef.current = v;
   };
 
+  // Cegah refresh/tutup tab tak sengaja saat ada kode yang belum dikirim.
+  useEffect(() => {
+    const dirtyNow = Boolean(level && level.editable && !grade && code !== level.code);
+    if (!dirtyNow) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [level, grade, code]);
+
   const isLast = node && levelIndex >= node.levels.length - 1;
 
-  const goToLevel = (idx: number) => setLevelIndex(idx);
+  // "Kotor" = ada ketikan yang belum dikirim di level yang bisa diedit & belum dinilai.
+  const dirty = Boolean(level && level.editable && !grade && code !== level.code);
+
+  const goToLevel = (idx: number) => {
+    if (
+      dirty &&
+      idx !== levelIndex &&
+      !window.confirm("Kode di editor belum dikirim dan akan hilang saat pindah level. Lanjut?")
+    ) {
+      return;
+    }
+    setLevelIndex(idx);
+  };
 
   const submit = useCallback(
     async (timeboxExceeded: boolean) => {
@@ -133,9 +159,9 @@ export default function NodeSession({ params }: { params: { id: string } }) {
     return (
       <Container>
         <BackLink />
-        <p className="mt-3 rounded-md border border-danger bg-danger-bg px-4 py-3 text-danger">
-          Error: {error}
-        </p>
+        <div className="mt-3">
+          <ErrorState error={error} onRetry={() => location.reload()} />
+        </div>
       </Container>
     );
   }
@@ -143,7 +169,9 @@ export default function NodeSession({ params }: { params: { id: string } }) {
     return (
       <Container>
         <BackLink />
-        <p className="mt-3 text-muted">Memuat…</p>
+        <div className="mt-4">
+          <EditorSkeleton />
+        </div>
       </Container>
     );
   }
@@ -160,12 +188,17 @@ export default function NodeSession({ params }: { params: { id: string } }) {
           <div className="mt-0.5 font-mono text-xs text-subtle">{node.id}</div>
         </div>
         {isVerify && (
-          <div className="shrink-0">
+          <div className="flex shrink-0 flex-col items-end gap-1">
             <Timebox
               seconds={level.timebox_seconds}
               running={isVerify && !grade}
               onExpire={() => submit(true)}
             />
+            {!grade && (
+              <span className="text-13 text-muted">
+                Habis waktu = kode otomatis dikirim
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -173,26 +206,37 @@ export default function NodeSession({ params }: { params: { id: string } }) {
       {/* Peta level — user selalu tahu posisinya, dan bisa lompat bebas
           (mis. balik ke L3 melihat materi lagi). Aman untuk invariant §1:
           L3–L1 tak mengirim attempt, sinyal reproduce-without-AI dihitung dari
-          attempt L0. */}
+          attempt L0.
+
+          PENTING: level yang sudah DILEWATI ditandai NETRAL (titik + border), BUKAN
+          centang hijau. Centang hijau = "terverifikasi benar lewat eksekusi"; melewati
+          scaffold hanyalah navigasi, tak ada test yang jalan. Memberi ✓ hijau di sini
+          justru memproduksi illusion of competence yang ditolak invariant §1. */}
       <div className="my-4 flex flex-wrap items-center gap-1.5">
         {node.levels.map((lv, i) => {
           const active = i === levelIndex;
-          const passed = i < levelIndex; // scaffold sudah dipudarkan melewati level ini
+          const visited = i < levelIndex; // scaffold sudah dilewati (navigasi, bukan lulus test)
           return (
             <button
               key={lv}
               type="button"
               onClick={() => goToLevel(i)}
-              title={active ? `Kamu di ${lv}` : `Lompat ke ${lv}`}
-              className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[13px] font-semibold transition-colors ${
+              aria-current={active ? "step" : undefined}
+              title={active ? `Kamu di ${lv}` : visited ? `Kembali ke ${lv}` : `Lompat ke ${lv}`}
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-13 font-semibold transition-colors ${
                 active
-                  ? "bg-accent text-accent-fg"
-                  : passed
-                    ? "bg-success-bg text-success hover:bg-neutral-bg"
-                    : "bg-neutral-bg text-muted hover:bg-border-muted"
+                  ? "border-accent bg-accent text-accent-fg"
+                  : visited
+                    ? "border-border bg-surface text-fg hover:bg-surface-muted"
+                    : "border-transparent bg-neutral-bg text-muted hover:bg-border-muted"
               }`}
             >
-              {passed && <IconCheck size={13} />}
+              {visited && (
+                <span
+                  aria-hidden="true"
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-subtle"
+                />
+              )}
               {lv}
             </button>
           );
@@ -208,7 +252,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
       </div>
 
       {level.signature_contract && (
-        <p className="mt-2 font-mono text-[13px] text-muted">
+        <p className="mt-2 font-mono text-13 text-muted">
           contract: {level.signature_contract}
         </p>
       )}
@@ -219,6 +263,9 @@ export default function NodeSession({ params }: { params: { id: string } }) {
           onChange={onCodeChange}
           language={level.language}
           readOnly={!level.editable || Boolean(grade)}
+          onSubmit={
+            isVerify && !grade && !submitting ? () => submit(false) : undefined
+          }
         />
       </div>
 
@@ -268,7 +315,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
               <div className="border-t border-border px-4 py-3">
                 <Markdown>{explanation.markdown}</Markdown>
                 {explanation.worked_example && (
-                  <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg p-4 text-[13px] text-code-fg">
+                  <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg p-4 text-13 text-code-fg">
                     {explanation.worked_example}
                   </pre>
                 )}
@@ -283,7 +330,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
         <div className="mt-4">
           <ProbeCard probe={probe} disabled={false} outcome={probeResult} onSubmit={answerProbe} />
           {probeResult === "incorrect" && (
-            <p className="mt-2 rounded-md border border-warning bg-warning-bg px-4 py-2.5 text-[13px] text-warning">
+            <p className="mt-2 rounded-md border border-warning bg-warning-bg px-4 py-2.5 text-13 text-warning">
               Produksimu terbukti (test hijau), tapi probe menunjukkan pemahaman masih
               rapuh — sukses berjarak <strong>belum bertambah</strong> dan interval review
               diperpendek. Jawab probe dengan benar untuk menuntaskan akuisisi.
@@ -300,7 +347,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
               ? "Node mastered (reproduce-without-AI terbukti berulang & berjarak)"
               : "Node acquired (reproduce-without-AI terbukti)"}
           </strong>
-          <p className="mt-1.5 text-[13px] text-muted">
+          <p className="mt-1.5 text-13 text-muted">
             {schedule?.became_mastered ? (
               <>
                 Sukses berjarak {schedule.consecutive_success}/{schedule.successes_needed} —
@@ -317,13 +364,13 @@ export default function NodeSession({ params }: { params: { id: string } }) {
             )}
           </p>
           {schedule?.due_at && (
-            <p className="mt-1.5 text-[13px] text-muted">
+            <p className="mt-1.5 text-13 text-muted">
               Masuk jadwal review: ~{schedule.interval_days?.toFixed(1)} hari lagi (
               {new Date(schedule.due_at).toLocaleDateString()}).
             </p>
           )}
           <Link href="/" className="mt-2 inline-block text-sm text-accent hover:underline">
-            ← Kembali ke daftar node
+            ← Kembali ke dashboard
           </Link>
         </div>
       )}
@@ -334,7 +381,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
 function BackLink() {
   return (
     <Link href="/" className="text-sm text-accent hover:underline">
-      ← Daftar node
+      ← Dashboard
     </Link>
   );
 }

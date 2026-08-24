@@ -152,7 +152,7 @@ export default function AuthoringPage() {
 
 function StatusBar({ status }: { status: IntegrationStatus }) {
   return (
-    <Card className="grid gap-1 p-4 text-[13px]">
+    <Card className="grid gap-1 p-4 text-13">
       <div>
         Integrasi:{" "}
         <strong className={status.enabled ? "text-success" : "text-danger"}>
@@ -223,7 +223,7 @@ function TriggerPanel({
               R4 · varian soal baru
             </Button>
           </div>
-          <p className="text-[13px] text-muted">
+          <p className="text-13 text-muted">
             R3 hanya bisa dipicu untuk node yang{" "}
             <strong className="font-semibold text-fg">punya attempt gagal</strong> — materi
             lahir dari kegagalan nyata, bukan dibaca lebih dulu.
@@ -274,7 +274,7 @@ function JobRow({ job, onOpen }: { job: AuthoringJob; onOpen: () => void }) {
           <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>{job.status}</Badge>
           <span className="font-mono text-xs text-subtle">{job.id}</span>
         </div>
-        <div className="text-[13px] text-muted">
+        <div className="text-13 text-muted">
           {String(job.request.node_id ?? job.request.repo_path ?? "")}
           {job.gate && !job.gate.passed && ` · gate: ${job.gate.reason}`}
           {job.error && ` · ${job.error}`}
@@ -312,7 +312,7 @@ function JobPanel({
       </div>
 
       {job.gate && (
-        <p className={`mt-2 text-[13px] ${job.gate.passed ? "text-success" : "text-danger"}`}>
+        <p className={`mt-2 text-13 ${job.gate.passed ? "text-success" : "text-danger"}`}>
           Gate otomatis: {job.gate.reason}
         </p>
       )}
@@ -378,13 +378,13 @@ function HypothesisTable({ rows }: { rows: Hypothesis[] }) {
   return (
     <section className="mt-10">
       <h2 className="text-lg font-semibold">Hipotesis codebase (R2)</h2>
-      <p className="mt-0.5 text-[13px] text-muted">
+      <p className="mt-0.5 text-13 text-muted">
         Hipotesis <strong className="font-semibold text-fg">tidak pernah</strong> jadi
         verdict: berapa pun confidence-nya, statusnya hanya berubah lewat attempt
         reproduksi. Ia boleh mengusulkan urutan, tak boleh menyatakan mastery.
       </p>
       <Card className="mt-3 overflow-x-auto">
-        <table className="w-full border-collapse text-[13px]">
+        <table className="w-full border-collapse text-13">
           <thead>
             <tr className="border-b border-border text-left text-muted">
               <th className="px-3 py-2 font-medium">node</th>
@@ -412,7 +412,7 @@ function HypothesisTable({ rows }: { rows: Hypothesis[] }) {
 function Banner({ tone, children }: { tone: "ok" | "bad"; children: React.ReactNode }) {
   return (
     <p
-      className={`mt-3 rounded-md border px-4 py-2.5 text-[13px] ${
+      className={`mt-3 rounded-md border px-4 py-2.5 text-13 ${
         tone === "ok" ? "border-success bg-success-bg text-success" : "border-danger bg-danger-bg text-danger"
       }`}
     >

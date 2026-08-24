@@ -8,6 +8,8 @@ import TestOutput from "../components/TestOutput";
 import Container from "../components/ui/Container";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
+import ErrorState from "../components/ui/ErrorState";
+import Card from "../components/ui/Card";
 import { IconCheck, IconX } from "../components/ui/Icon";
 
 /**
@@ -63,16 +65,33 @@ export default function PlacementPage() {
         subtitle="Tantangan turun dari yang paling jauh di hilir ke yang paling primitif. Sesi berhenti di node pertama yang berhasil kamu produksi — itulah lantai awalmu. Gagal di sini bukan kegagalan; justru itu cara lantainya ketemu."
       />
 
-      {error && (
-        <p className="rounded-md border border-danger bg-danger-bg px-4 py-3 text-danger">
-          Error: {error}
-        </p>
-      )}
+      {error && <ErrorState error={error} onRetry={start} />}
 
-      {!state && (
-        <Button variant="primary" onClick={start}>
-          Mulai sesi placement
-        </Button>
+      {!state && !error && (
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold">Yang akan terjadi</h2>
+          <ol className="mt-2 grid gap-1.5 text-sm text-muted">
+            <li>
+              <strong className="font-semibold text-fg">1.</strong> Kamu diberi tantangan
+              reproduksi, dari yang paling jauh di hilir ke yang paling primitif.
+            </li>
+            <li>
+              <strong className="font-semibold text-fg">2.</strong> Tiap tantangan ada
+              timebox. Habis waktu = kode otomatis dikirim &amp; dinilai eksekusi.
+            </li>
+            <li>
+              <strong className="font-semibold text-fg">3.</strong> Sesi berhenti di node
+              pertama yang berhasil kamu produksi — itulah lantai awalmu.
+            </li>
+          </ol>
+          <p className="mt-3 text-13 text-muted">
+            Tak ada pertanyaan &quot;kamu sudah bisa apa&quot;: lantai ditemukan lewat
+            eksekusi, bukan self-report.
+          </p>
+          <Button variant="primary" className="mt-4" onClick={start}>
+            Mulai sesi placement
+          </Button>
+        </Card>
       )}
 
       {state && (
@@ -115,7 +134,7 @@ function Progress({ state }: { state: PlacementState }) {
           <span
             key={t.node_id}
             title={t.node_id}
-            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-mono text-[13px] font-semibold ${
+            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-mono text-13 font-semibold ${
               pass ? "bg-success-bg text-success" : "bg-danger-bg text-danger"
             }`}
           >
@@ -141,7 +160,7 @@ function Finished({
     return (
       <div className="mt-4 rounded-md border border-warning bg-warning-bg px-5 py-4">
         <strong className="text-warning">Lantai belum ketemu.</strong>
-        <p className="mt-1 text-[13px] text-muted">
+        <p className="mt-1 text-13 text-muted">
           Batas {state.max_nodes} node tercapai tanpa satu pun lolos — sesi dihentikan
           supaya tidak melelahkan. Itu sendiri informasi: mulai dari node paling
           primitif yang tersedia, atau kurikulumnya butuh node yang lebih dasar lagi.
@@ -160,7 +179,7 @@ function Finished({
         <IconCheck size={16} />
         Lantai ditemukan: <code className="font-mono">{state.floor_node_id}</code>
       </strong>
-      <p className="mt-1.5 text-[13px] text-muted">
+      <p className="mt-1.5 text-13 text-muted">
         Kamu memproduksinya dari nol tanpa scaffold apa pun, jadi node ini langsung{" "}
         <code className="font-mono">acquired</code> dan masuk jadwal review
         {last?.floor_outcome?.interval_days != null && (
@@ -169,7 +188,7 @@ function Finished({
         .
       </p>
       {last && last.unlocked.length > 0 && (
-        <p className="mt-1.5 text-[13px] text-muted">
+        <p className="mt-1.5 text-13 text-muted">
           Prasyaratnya <strong>dibuka</strong> jadi <code className="font-mono">tersedia</code>:{" "}
           {last.unlocked.map((n) => (
             <code key={n} className="mr-1.5 font-mono">
