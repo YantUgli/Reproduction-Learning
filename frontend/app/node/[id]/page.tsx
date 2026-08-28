@@ -18,6 +18,7 @@ import Timebox from "../../components/Timebox";
 import TestOutput from "../../components/TestOutput";
 import Container from "../../components/ui/Container";
 import Button from "../../components/ui/Button";
+import { useConfirm } from "../../components/ui/ConfirmProvider";
 import { IconArrowRight, IconCheck } from "../../components/ui/Icon";
 import ErrorState from "../../components/ui/ErrorState";
 import { EditorSkeleton } from "../../components/ui/Skeleton";
@@ -30,6 +31,7 @@ const SandboxEditor = dynamic(() => import("../../components/SandboxEditor"), {
 
 export default function NodeSession({ params }: { params: { id: string } }) {
   const nodeId = params.id;
+  const confirm = useConfirm();
   const [node, setNode] = useState<NodeDetail | null>(null);
   const [levelIndex, setLevelIndex] = useState(0);
   const [level, setLevel] = useState<LevelView | null>(null);
@@ -96,13 +98,17 @@ export default function NodeSession({ params }: { params: { id: string } }) {
   // "Kotor" = ada ketikan yang belum dikirim di level yang bisa diedit & belum dinilai.
   const dirty = Boolean(level && level.editable && !grade && code !== level.code);
 
-  const goToLevel = (idx: number) => {
-    if (
-      dirty &&
-      idx !== levelIndex &&
-      !window.confirm("Kode di editor belum dikirim dan akan hilang saat pindah level. Lanjut?")
-    ) {
-      return;
+  const goToLevel = async (idx: number) => {
+    if (dirty && idx !== levelIndex) {
+      const ok = await confirm({
+        title: "Kode belum dijalankan",
+        description:
+          "Kode yang kamu tulis di editor belum dijalankan dan akan hilang saat pindah level. Tetap pindah?",
+        confirmLabel: "Pindah, buang kode",
+        cancelLabel: "Tetap di sini",
+        tone: "danger",
+      });
+      if (!ok) return;
     }
     setLevelIndex(idx);
   };
@@ -124,10 +130,14 @@ export default function NodeSession({ params }: { params: { id: string } }) {
         });
         setGrade(out);
         if (out.passed) {
-          const p = await api.getProbe(nodeId).catch(() => null);
-          setProbe(p);
+          // Probe hanya untuk verifikasi L0. Di latihan berscaffold (mode
+          // acquisition) probe tak menggerakkan status, jadi tak perlu diminta.
+          if (level.kind === "verify") {
+            setProbe(await api.getProbe(nodeId).catch(() => null));
+          }
         } else {
-          // Baru sekarang materi boleh muncul: kegagalannya sudah terjadi.
+          // Baru sekarang materi boleh muncul: kegagalannya sudah terjadi — nyata,
+          // termasuk gagal saat menjalankan latihan berscaffold.
           setExplanation(await api.getExplanation(nodeId).catch(() => null));
         }
       } catch (e) {
@@ -262,25 +272,39 @@ export default function NodeSession({ params }: { params: { id: string } }) {
           value={code}
           onChange={onCodeChange}
           language={level.language}
-          readOnly={!level.editable || Boolean(grade)}
+          // Verifikasi L0 mengunci editor setelah dinilai (attempt terkirim). Level
+          // scaffold (latihan) TETAP editable supaya bisa iterasi & jalankan ulang.
+          readOnly={!level.editable || (isVerify && Boolean(grade))}
           onSubmit={
-            isVerify && !grade && !submitting ? () => submit(false) : undefined
+            level.editable && !submitting && !(isVerify && grade)
+              ? () => submit(false)
+              : undefined
           }
         />
       </div>
 
-      {/* Aksi per level */}
+      {/* Aksi per level scaffold: JALANKAN (latihan, mode acquisition — di-grade &
+          tampil output tapi tak dihitung KPI / tak mengubah status) + LANJUT.
+          Tombol jalankan hanya di level editable (L2/L1); L3 (worked example) tak
+          bisa dijalankan, jadi "Lanjut" yang jadi aksi primer di sana. */}
       {!isVerify && (
-        <Button
-          variant="primary"
-          onClick={() => !isLast && goToLevel(levelIndex + 1)}
-          disabled={Boolean(isLast)}
-        >
-          {level.kind === "worked_example"
-            ? "Saya paham — coba reproduksi"
-            : "Lanjut (pudarkan scaffold)"}
-          <IconArrowRight size={15} />
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {level.editable && (
+            <Button variant="primary" onClick={() => submit(false)} loading={submitting}>
+              {submitting ? "Menjalankan…" : "Jalankan (latihan)"}
+            </Button>
+          )}
+          <Button
+            variant={level.editable ? "secondary" : "primary"}
+            onClick={() => !isLast && goToLevel(levelIndex + 1)}
+            disabled={Boolean(isLast)}
+          >
+            {level.kind === "worked_example"
+              ? "Saya paham — coba reproduksi"
+              : "Lanjut (pudarkan scaffold)"}
+            <IconArrowRight size={15} />
+          </Button>
+        </div>
       )}
 
       {isVerify && !grade && (
@@ -294,7 +318,19 @@ export default function NodeSession({ params }: { params: { id: string } }) {
         <div className="mt-4">
           <TestOutput passed={grade.passed} output={grade.test_output} timedOut={grade.timed_out} />
 
-          {!grade.passed && (
+          {/* Latihan berscaffold yang lolos: jujurkan bahwa ini BELUM dihitung. */}
+          {grade.passed && !isVerify && (
+            <p className="mt-3 rounded-md border border-border bg-surface-muted px-4 py-2.5 text-13 text-muted">
+              Lolos dengan scaffold di layar — ini <strong>latihan</strong>, belum dihitung
+              sebagai reproduce-without-AI. Editor tetap terbuka: iterasi bebas, lalu{" "}
+              <strong>pudarkan scaffold</strong> sampai <strong>L0</strong> untuk verifikasi
+              tanpa bantuan.
+            </p>
+          )}
+
+          {/* Tombol pemulihan hanya untuk verifikasi L0; di latihan editor tetap
+              editable & tombol Jalankan tetap ada, jadi ini akan mubazir. */}
+          {isVerify && !grade.passed && (
             <div className="mt-3 flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => goToLevel(levelIndex)}>
                 Coba lagi (level ini)

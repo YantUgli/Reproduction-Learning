@@ -439,3 +439,17 @@ alasan · alternatif yang ditolak.
   mayoritas kartu terkunci — praktis tak terbaca. Token eksplisit lulus AA & bisa diaudit.
   *Ditolak:* biarkan opacity (kontras tak terprediksi), turunkan target ke AA-large (teks
   kecil butuh 4.5).
+
+- **2026-08-28 · UI · Auto-indent editor DIHIDUPKAN: `autoIndent: "none"` → `"advanced"`
+  (SandboxEditor).** Membalik keputusan lama (dulu `"none"` untuk mencegah `def f():`⏎`    x`
+  jadi 8 spasi). Alasan pembalikan: `"none"` mematikan SELURUH auto-indent — termasuk
+  "pertahankan indent baris sebelumnya" — sehingga tiap Enter di body fungsi melempar kursor
+  ke kolom 0, menyakitkan untuk mengetik Python. `"advanced"` mengaktifkan `onEnterRules`
+  bawaan Monaco per-bahasa (Python & JS/TS untuk React `.jsx`): indent otomatis setelah baris
+  `…:` dan keep-indent. Aman §2 — whitespace deterministik, bukan saran solusi. Penggandaan
+  8-spasi lama bukan perilaku otomatis; hanya muncul bila user mengetik spasi manual di atas
+  indent otomatis (sama seperti di VSCode/IDE, dan Bryant sudah terbiasa tak melakukannya).
+  *Ditolak:* `"full"` (ikut me-reindent baris SAAT mengetik → berisiko mengacak
+  `starter_code` scaffold L2), dan meniru ekstensi "Python Indent" VSCode dari nol (auto-dedent
+  sesudah `return/pass/break/raise` via onEnterRules kustom — ditunda; tak ada di built-in
+  Monaco, bisa ditambahkan belakangan bila dirindukan). Perubahan satu opsi, murni frontend.

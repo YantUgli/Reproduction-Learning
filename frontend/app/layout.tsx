@@ -1,4 +1,5 @@
 import "./globals.css";
+import { ConfirmProvider } from "./components/ui/ConfirmProvider";
 
 export const metadata = {
   title: "Reproduction Learning Engine",
@@ -13,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className="min-h-screen bg-canvas px-4 py-8 text-fg antialiased sm:px-8">
-        {children}
+        <ConfirmProvider>{children}</ConfirmProvider>
       </body>
     </html>
   );

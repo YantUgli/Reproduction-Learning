@@ -78,10 +78,14 @@ export default function SandboxEditor({
             scrollBeyondLastLine: false,
             // Wrap: di layar sempit (mobile) baris kode tak lagi terpotong horizontal.
             wordWrap: "on",
-            // Indentasi: user yang mengetik spasinya sendiri. `none` mematikan
-            // auto-indent supaya spasi ketikan tak menumpuk di atas indent otomatis
-            // (dulu `def f():`⏎`    x` jadi 8 spasi → IndentationError palsu).
-            autoIndent: "none",
+            // Indentasi otomatis ala IDE (indent setelah `def …:`, pertahankan indent
+            // baris sebelumnya) memakai onEnterRules bawaan Monaco per-bahasa — Python
+            // & JS/TS (React `.jsx`). Deterministik, bukan saran solusi → §2 aman.
+            // `"advanced"` (bukan `"full"`) sengaja dipilih: ia TIDAK me-reindent baris
+            // yang sudah ada saat mengetik, jadi `starter_code` scaffold L2 tak teracak.
+            // Penggandaan indent lama (`def f():`⏎`    x` → 8 spasi) hanya terjadi bila
+            // user mengetik spasi manual di atas indent otomatis — sama seperti di IDE.
+            autoIndent: "advanced",
             detectIndentation: false,
             insertSpaces: true,
             tabSize: 4,
