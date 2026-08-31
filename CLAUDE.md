@@ -24,9 +24,11 @@ konfirmasi ke manusia** — kemungkinan besar tugasnya salah-baca, bukan invaria
    masuk AI-sebagai-hakim. Pemahaman diperiksa lewat **comprehension probe
    deterministik** (predict output / spot bug / trace) yang punya jawaban benar
    pasti. Refleksi teks bebas boleh disimpan sebagai catatan, **tak pernah jadi gate**.
-4. **Edge prerequisite berasal dari sumber otoritatif + Isyah,** bukan dari LLM.
-   Kamu boleh *mengusulkan* kandidat node/edge; Isyah yang prune & menandai
-   `hard`/`soft`.
+4. **Edge prerequisite tidak pernah berdiri di atas asersi LLM.** Kamu boleh
+   *mengusulkan* kandidat node/edge; edge sah setelah berpaut sumber otoritatif **dan**
+   lolos validasi mesin (bukti konstruk hulu terpakai di `reference_solution` hilir +
+   validasi prediktif dari data `Attempt`). Approve Isyah tak lagi jadi gerbang blokir —
+   lihat §7 entri 2026-08-31 (termasuk status implementasinya).
 5. **Jangan bangun yang sudah ditolak di §8:** content library/bab materi panjang,
    AI penentu learning path, AI penilai mastery, esai sebagai gate, multi-domain/
    ingestion generik di v1, graf visual/DAG explorer di v1, `metric_threshold`
@@ -108,13 +110,13 @@ artifact** (PRD §10). Ringkas:
 
 | Peran | Output | Gate |
 |---|---|---|
-| R1 Ekstraksi kandidat node/edge | `nodes.proposed.yaml`, `edges.proposed.yaml` + sitasi | Isyah prune & tandai hard/soft |
+| R1 Ekstraksi kandidat node/edge | `nodes.proposed.yaml`, `edges.proposed.yaml` + sitasi | Validasi mesin: bukti konstruk + prediktif dari `Attempt` (§7 2026-08-31) |
 | R2 Bukti codebase | `hypotheses.json` | Hipotesis; **wajib** diverifikasi Attempt |
-| R3 Materi just-in-time | `explanation.md` + worked example bersitasi | Sitasi wajib verifiable |
-| R4 Generator soal | ChallengeInstance + hidden test + probe | Isyah review; test wajib deterministik & hijau di solusi referensi |
+| R3 Materi just-in-time | `explanation.md` + worked example bersitasi | Kutipan verbatim cocok dengan snapshot sumber; sampai ke Bryant hanya lewat gerbang 403 |
+| R4 Generator soal | ChallengeInstance + hidden test + probe | Triad eksekusi (kosong MERAH, starter MERAH, referensi HIJAU) + probe terverifikasi eksekusi |
 
-**Tidak pernah diberikan ke AI:** menetapkan edge final, menyatakan mastery,
-menilai teks bebas.
+**Tidak pernah diberikan ke AI:** menyatakan mastery, menilai teks bebas, atau
+menetapkan edge final dari asersi belaka (tanpa lolos validasi mesin — §7 2026-08-31).
 
 ---
 
@@ -133,10 +135,11 @@ cd backend && pytest && ruff check .
 # Muat seluruh node data/ ke SQLite (SEMUA domain; idempoten; dari repo root)
 python scripts/load_nodes.py            # atau: python scripts/load_nodes.py react
 
-# Gerbang mutu authoring — semua domain, lewat grader masing-masing (M6).
-# DUA pemeriksaan per instance: referensi wajib HIJAU, starter wajib MERAH.
+# Gerbang mutu authoring — semua domain, lewat grader masing-masing (M6, TRIAD di M7).
+# TIGA pemeriksaan per instance (referensi HIJAU, solusi kosong MERAH, starter MERAH)
+# + tiap probe DIJALANKAN untuk membuktikan kunci jawabannya benar.
 python scripts/verify_nodes.py                 # atau: ... verify_nodes.py ml
-python scripts/verify_nodes.py --skip-starter  # 2x lebih cepat; JANGAN untuk commit
+python scripts/verify_nodes.py --skip-starter  # 3x lebih cepat; JANGAN untuk commit
 
 # Runtime grading React (M6) — sekali saja, sebelum node React bisa dinilai
 cd runtime/react && npm install
@@ -147,17 +150,22 @@ cd frontend && npm run dev
 
 Halaman frontend (M4): `/` dashboard + KPI · `/node/[id]` sesi akuisisi L3→L0 ·
 `/placement` menemukan lantai · `/review` sesi review jatuh tempo.
-Halaman M5: `/authoring` meja review Isyah (antrean artifact Claude Code).
+Halaman M5: `/authoring` meja audit — node/edge tertandai telemetri + tombol pensiun
+(dulu antrean approve blokir; §7 2026-08-31).
 
 ```bash
 # Integrasi Claude Code (M5) — semuanya opsional bagi loop inti.
 CLAUDE_INTEGRATION_ENABLED=0 uvicorn app.main:app --reload   # kill switch: trigger balas 503
+CLAUDE_AUTO_PROMOTE=0 uvicorn app.main:app --reload          # M7: artifact berhenti di `ready`
 ```
 
-Alur M5 satu artifact: `POST /authoring/{r2,r3,r4}` (balas `202`, job `pending`) →
+Alur satu artifact (M5, diubah M7): `POST /authoring/{r2,r3,r4}` (balas `202`, job `pending`) →
 Claude Code jalan di latar & menulis ke `artifacts/<role>/<stamp>/` → skema
-(`contracts.py`) → gate otomatis R4 (eksekusi test) → `ready` → **Isyah approve di
-`/authoring`** → promosi ke `data/`/DB. Tanpa approve, tak ada yang masuk sistem.
+(`contracts.py`) → gerbang mesin (triad eksekusi R4, probe DIJALANKAN, kutipan verbatim
+R3) → `ready` → **promosi otomatis** ke `data/`/DB. Tanpa lolos gerbang mesin, tak ada yang
+masuk sistem. Peninjauan manusia pindah ke belakang: `GET /authoring/audit` melaporkan node
+tertandai telemetri + edge yang belum terkukuhkan (halaman frontend-nya belum ada).
+`CLAUDE_AUTO_PROMOTE=0` mengembalikan alur lama (berhenti di `ready`, menunggu approve).
 `artifacts/` git-ignored; yang di-commit adalah hasil promosinya di `data/`.
 
 ---
@@ -453,3 +461,114 @@ alasan · alternatif yang ditolak.
   `starter_code` scaffold L2), dan meniru ekstensi "Python Indent" VSCode dari nol (auto-dedent
   sesudah `return/pass/break/raise` via onEnterRules kustom — ditunda; tak ada di built-in
   Monaco, bisa ditambahkan belakangan bila dirindukan). Perubahan satu opsi, murni frontend.
+
+- **2026-08-31 · AUTONOMI · Approve Isyah dicabut sebagai gerbang BLOKIR; diganti
+  tumpukan gerbang mesin + telemetri kurikulum. Membalik keputusan 2026-08-22 M5
+  ("Approve Isyah WAJIB untuk ketiga peran") dan melonggarkan §1.4.** Tujuan yang
+  diminta Isyah: Bryant bisa belajar dan mendapat materi **tanpa Isyah di jalur**.
+  Yang membuat ini bisa diterima tanpa menggores inti: peran Isyah di sistem ini
+  **tak pernah** gerbang *mastery* — verdict selalu eksekusi kode (§1.2) — melainkan
+  gerbang **kualitas konten**. Maka §1.2 dan §1.3 tidak tersentuh sedikit pun; yang
+  dilonggarkan hanya §1.4 dan gate approve M5. Asimetri yang menopangnya: **node buruk
+  memakan waktu Bryant** (terlihat, terbatas, bisa dicabut retroaktif), **verdict
+  mastery buruk menanam keyakinan palsu** (tak terlihat, korosif) — hanya kategori
+  pertama yang diotomasi.
+
+  **Gerbang pengganti** (semuanya mesin/eksekusi, jalan sebelum artifact masuk sistem):
+  (a) dua-pemeriksaan R4 lama dinaikkan jadi **triad** — berkas kosong MERAH, starter
+  MERAH, referensi HIJAU; (b) **probe wajib terverifikasi eksekusi** — `probe_*.yaml`
+  mendapat field snippet/ekspresi, harness menjalankannya, `correct_answer` wajib sama
+  dengan output nyata dan tiap distractor wajib berbeda (hari ini probe masih prosa,
+  tak terperiksa mesin sama sekali); (c) **grounding R3 naik dari "ID sumber ada" ke
+  "kutipan verbatim cocok"** — teks sumber di-snapshot ke `data/sources/<id>.md`, tiap
+  klaim membawa kutipan yang dicek sebagai substring; (d) **edge butuh bukti, bukan
+  asersi LLM** — konstruk hulu harus benar-benar terpakai di `reference_solution` hilir,
+  dan klaim prasyarat divalidasi prediktif dari data `Attempt`; (e) deteksi
+  tumpang-tindih — reference solution node lama tak boleh lolos hidden test node baru.
+
+  **Pengganti mata Isyah di level kurikulum = telemetri, bukan audit manusia:** pass
+  rate, waktu-sampai-lolos vs `estimated_minutes`, lapse rate FSRS, dan daya beda per
+  node — semuanya dari data yang sudah tersimpan. Node lolos-100%-tanpa-pernah-gagal =
+  trivia; node tak-pernah-lolos = rusak. Ini bisa dilakukan proyek ini dan **tak bisa**
+  dilakukan sistem rujukan: Eero/Alter boleh full-AI-assisted justru karena tak ada satu
+  momen pun di sistem mereka yang bisa ketahuan salah — gate mereka MCQ/"Test me" yang
+  dinilai AI sendiri, jadi kurikulum buruk tak meninggalkan jejak. Metrik mereka ("terasa
+  diajar") tak mungkin gagal; metrik proyek ini (pass rate reproduksi dingin) bisa turun.
+  Keberhasilan mereka karena itu bukan bukti yang bisa dipinjam.
+
+  **Batas yang diterima sadar:** (1) **n=1** — statistik per-node dari satu pelajar itu
+  berisik, jadi telemetri hanya **MENANDAI** node curiga; **tak ada pensiun otomatis**,
+  pencabutan selalu satu klik manusia. (2) **Relevansi terhadap tujuan tak punya oracle**
+  di sistem mana pun; ia ditetapkan manusia **sekali per domain** (`destination`), bukan
+  per node. `/authoring` berubah fungsi: dari antrean blokir jadi **meja audit + tombol
+  pensiun**.
+
+  **Konsekuensi untuk lajur KM** ([docs/brainstorm-knowledge-management-lane.md](docs/brainstorm-knowledge-management-lane.md)):
+  tanpa manusia yang membaca materi generate sebelum sampai ke Bryant, gerbang **403**
+  (materi hanya muncul setelah attempt gagal) menjadi **satu-satunya** perlindungan
+  tersisa terhadap content library §8. Karena itu **prosa penjelasan buatan AI tidak
+  pernah mendarat di `library/`** — ia hidup di `artifacts/` dan sampai hanya lewat 403;
+  `library/` memuat tulisan/transkripsi Bryant + kerangka & indeks saja.
+
+  **STATUS IMPLEMENTASI per 2026-09-01 (M7 dikerjakan):** (a) triad, (b) probe tereksekusi,
+  (c) grounding verbatim, telemetri, dan promosi otomatis **SUDAH** terpasang. (d) bukti edge
+  diturunkan jadi laporan dan (e) deteksi tumpang-tindih dibatalkan — keduanya dengan bukti
+  pengukuran, lihat entri 2026-09-01. Yang BELUM: halaman audit frontend, tombol pensiun,
+  `destination` per domain, dan snapshot `data/sources/<id>.md` (tanpa snapshot, job R3
+  ditolak — itu perilaku yang diinginkan, bukan bug).
+
+  *Ditolak:* (i) mempertahankan approve blokir (tujuan gagal total — Bryant menunggu
+  manusia untuk tiap materi); (ii) audit manusia berkala ±15 menit per 20 node (usul awal
+  agent; dicabut karena telemetri melakukannya lebih baik, terus-menerus, dan dari oracle
+  yang sama yang memvonis mastery); (iii) nol manusia sepenuhnya termasuk `destination`
+  (menghemat sangat sedikit, dan melepas satu-satunya pemeriksa arah kurikulum);
+  (iv) pensiun otomatis dari telemetri (n=1 terlalu berisik — akan mencabut node bagus
+  di hari Bryant sedang buruk).
+
+- **2026-09-01 · M7 · Pelaksanaan gerbang mesin: tiga penyimpangan dari rencana, semuanya
+  karena diuji atas kurikulum nyata sebelum dipasang.** Rencana M7 ditulis sebelum
+  kodenya ada; tiga bagiannya tak selamat dari kontak dengan data.
+
+  (a) **Bukti edge statis DITURUNKAN dari gerbang jadi laporan.** Rencana: konstruk khas
+  hulu wajib muncul di `reference_solution` hilir, kalau tidak edge `hard` ditolak.
+  Diukur atas 14 edge hard / 19 node, aturan itu menandai **6–7 edge dan hampir semuanya
+  salah tuduh**. Sebabnya struktural, bukan ambang: sidik jari dibangun dari token yang
+  JARANG (kalau tidak, `def`/`app` membuat semua edge "terbukti"), padahal konstruk yang
+  benar-benar diwariskan node fondasi justru yang PALING SERING muncul — `@app.get` ada
+  di hampir tiap node FastAPI. Filternya membuang persis bukti yang dicari. Kesimpulan
+  yang dipegang: **kesamaan konstruk bisa MENGUKUHKAN edge, ketiadaannya tidak
+  membuktikan edge itu salah.** Sekarang `edge_evidence.corroboration()` melaporkan
+  (11/14 terkukuhkan, 3 belum) dan tak pernah memblokir. Pengganti gerbangnya adalah
+  pembatasan AKIBAT: **edge usulan AI hanya boleh `soft`** — hanya `hard` yang mengunci
+  urutan, jadi edge soft yang salah cuma saran keliru, sedangkan edge hard yang salah
+  mengunci Bryant keluar dari node yang sebenarnya siap ia kerjakan.
+
+  (b) **Deteksi tumpang-tindih (langkah 5) DIBATALKAN.** Aturannya ("reference solution
+  lama tak boleh lolos hidden test baru") diuji lebih dulu: di `n001_paginate`, referensi
+  `variant_a` LOLOS hidden test `variant_b` — dan kedua varian itu sah. Untuk node fungsi
+  murni, kontraknya memang sama dan transfer diuji lewat DATA, jadi solusi umum yang benar
+  wajar lolos semua varian. Aturan itu akan menolak pekerjaan yang benar. Deteksi duplikat
+  antar-NODE tetap masuk akal, tapi belum ada jalur kode yang membuat node baru (R1 masih
+  manual) — dan grader tanpa node adalah kode yang tak pernah dijalankan (preseden M6
+  `structural`). *Ditolak:* memasangnya sebagai peringatan (peringatan yang 100% salah di
+  satu kelas node akan diabaikan, lalu ikut menulikan peringatan lain).
+
+  (c) **Probe dapat field `expected_value`, dan gate AI dibuat LEBIH KETAT daripada
+  gerbang manusia.** Saat migrasi, ternyata banyak `correct_answer` bukan nilai yang
+  diproduksi program melainkan prosa ("kosong (0 byte)") atau rumus (`(2/n) * X.T @ ...`).
+  Templat "PROBE_RESULT == correct_answer" hanya cocok untuk 8 dari 19. `expected_value`
+  memisahkan teks yang DITAMPILKAN dari nilai yang DIEKSEKUSI, sehingga klaim di balik
+  opsi tetap dibuktikan (`m003` diverifikasi dengan membandingkan rumusnya terhadap
+  gradien numerik). Batasnya: jembatan prosa→nilai ditulis manusia dan tak terperiksa
+  mesin. Karena itu **probe buatan AI dilarang memakainya** — di jalur itu tak ada penulis
+  yang bisa ditanya, jadi jawabannya wajib berupa nilai yang persis keluar dari eksekusi.
+
+  Ikut ditemukan & diperbaiki (semuanya kebocoran `.py` yang baru terlihat saat gerbangnya
+  benar-benar dijalankan lintas domain): gate R4 (`jobs._gate_r4`) menilai lewat
+  `SubprocessExecutor` mentah + membaca `reference_solution.py` literal — artinya node
+  React/ML **tak pernah benar-benar tergerbang**; `contracts.load_challenge` menolak
+  artifact `.jsx` di skema sebelum gate sempat jalan; `review_queue` menulis varian hasil
+  promosi dengan ekstensi `.py` mati. Plus satu bug fatal di gerbang authoring:
+  `verify_nodes.py` MATI dengan `UnicodeEncodeError` saat mencetak output vitest (U+276F
+  di konsol cp1252) — persis ketika sedang melaporkan kegagalan, jadi pesan yang paling
+  dibutuhkan justru yang hilang.

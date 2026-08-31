@@ -56,7 +56,8 @@ M0  Scaffolding & Data Model ─┬─▶ M1  Execution Harness ─┬─▶ M2 
                                                               │            ▲
                                                               │            └── GERBANG 0 wajib diputuskan sebelum sini
                                                               ├─▶ M5  Claude Code Integration (Fase 3)
-                                                              └─▶ M6  Domain Kedua: React → ML (Fase 4)
+                                                              ├─▶ M6  Domain Kedua: React → ML (Fase 4)
+                                                              └─▶ M7  Gerbang Mesin & Telemetri Kurikulum (autonomi)
 ```
 
 | ID | Milestone | Peta PRD | Dependency | Est. | Status |
@@ -68,6 +69,7 @@ M0  Scaffolding & Data Model ─┬─▶ M1  Execution Harness ─┬─▶ M2 
 | [M4](milestones/M4-full-loop-fsrs-dashboard.md) | Full Loop: FSRS + Placement + Dashboard | Fase 2 | M3 + Gerbang 0 | 2–3 minggu | ✅ selesai |
 | [M5](milestones/M5-claude-code-integration.md) | Claude Code Integration | Fase 3 | M4 | 3–4 minggu | ✅ selesai |
 | [M6](milestones/M6-second-domain.md) | Domain Kedua (React → ML) | Fase 4 | M4 | variabel |
+| [M7](milestones/M7-machine-gates-and-curriculum-telemetry.md) | Gerbang Mesin & Telemetri Kurikulum | §10 | M5, M6 | variabel | sebagian (Bagian A & B + promosi otomatis; UI audit belum) |
 
 ---
 
@@ -88,7 +90,7 @@ gerbang ini.
 
 Dua sumbu jalan **paralel** (PRD §12):
 
-- **Engineering:** M0 → M1 → M3 → M4 → M5/M6.
+- **Engineering:** M0 → M1 → M3 → M4 → M5/M6 → M7.
 - **Authoring:** M2 (5 node untuk menyalakan M3), lalu **A2** (~20 node sisa,
   ~30–60 jam) yang dikarang paralel sepanjang M4 dan seterusnya.
 
@@ -109,3 +111,13 @@ hidden test hijau di solusi referensi.
 
 Kalau kamu menyelesaikan sebuah milestone, perbarui statusnya di tabel §2 dan catat
 keputusan tak terduga di CLAUDE.md (bagian "Log keputusan").
+
+---
+
+## 6. Dokumen pendukung (bukan milestone)
+
+| Dokumen | Isi | Kapan dibuka |
+|---|---|---|
+| [sisa-pekerjaan-m7.md](sisa-pekerjaan-m7.md) | Butir M7 yang sengaja belum dikerjakan + alasannya, dipisah antara "menunggu manusia" dan "hutang teknis" | Sebelum melanjutkan M7, atau saat bertanya "kenapa ini belum ada" |
+| [brainstorm-knowledge-management-lane.md](brainstorm-knowledge-management-lane.md) | Arah lajur Library/KM (course intake, catatan) — diskusi, bukan keputusan | Saat membahas lajur knowledge management |
+| [reference-eero-ai-learning-video.md](reference-eero-ai-learning-video.md) · [reference-alter-ai-learning-video.md](reference-alter-ai-learning-video.md) | Analisis dua sistem belajar-dengan-AI eksternal + di mana ia berpisah dari invariant | Saat menguji ketahanan invariant terhadap ide dari luar |
