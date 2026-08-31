@@ -1,10 +1,25 @@
 id: n009_probe_01
 node_id: n009_query_param_constraint
 type: predict_output
-question: '`q` dideklarasikan `str = Query(min_length=3)` (tanpa default). Request GET /search?q=ab menghasilkan status berapa?'
+question: '`q` dideklarasikan `str = Query(min_length=3)` (tanpa default). Request
+  GET /search?q=ab menghasilkan status berapa?'
 options:
-  - '200'
-  - '400'
-  - '422'
-  - '404'
+- '200'
+- '400'
+- '422'
+- '404'
 correct_answer: '422'
+snippet: |
+  from fastapi import FastAPI, Query
+  from fastapi.testclient import TestClient
+
+  app = FastAPI()
+
+
+  @app.get("/search")
+  def search(q: str = Query(min_length=3)):
+      return {"q": q}
+
+
+  client = TestClient(app)
+expression: client.get("/search?q=ab").status_code

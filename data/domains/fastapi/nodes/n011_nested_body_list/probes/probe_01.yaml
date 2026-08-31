@@ -1,10 +1,37 @@
 id: n011_probe_01
 node_id: n011_nested_body_list
 type: predict_output
-question: 'Order punya `lines: list[Line]` dengan `Line.qty: int`. POST body {"customer": "ada", "lines": [{"sku": "A", "qty": "two"}]} menghasilkan status berapa?'
+question: 'Order punya `lines: list[Line]` dengan `Line.qty: int`. POST body {"customer":
+  "ada", "lines": [{"sku": "A", "qty": "two"}]} menghasilkan status berapa?'
 options:
-  - '200'
-  - '201'
-  - '400'
-  - '422'
+- '200'
+- '201'
+- '400'
+- '422'
 correct_answer: '422'
+snippet: |
+  from fastapi import FastAPI
+  from fastapi.testclient import TestClient
+  from pydantic import BaseModel
+
+  app = FastAPI()
+
+
+  class Line(BaseModel):
+      sku: str
+      qty: int
+
+
+  class Order(BaseModel):
+      customer: str
+      lines: list[Line]
+
+
+  @app.post("/orders")
+  def create_order(order: Order):
+      return order
+
+
+  client = TestClient(app)
+expression: 'client.post("/orders", json={"customer": "ada", "lines": [{"sku": "A",
+  "qty": "two"}]}).status_code'

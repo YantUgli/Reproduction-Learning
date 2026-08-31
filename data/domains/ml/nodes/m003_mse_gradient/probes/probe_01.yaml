@@ -1,10 +1,38 @@
 id: m003_probe_01
 node_id: m003_mse_gradient
 type: trace
-question: "Loss = mean((X@w + b - y)^2) dengan n baris data. Bentuk dw yang benar adalah?"
+question: Loss = mean((X@w + b - y)^2) dengan n baris data. Bentuk dw yang benar adalah?
 options:
-  - "(2/n) * X.T @ (X@w + b - y)"
-  - "(1/n) * X.T @ (y - X@w - b)"
-  - "2 * X @ (X@w + b - y)"
-  - "(2/n) * X @ (X.T @ w - y)"
-correct_answer: "(2/n) * X.T @ (X@w + b - y)"
+- (2/n) * X.T @ (X@w + b - y)
+- (1/n) * X.T @ (y - X@w - b)
+- 2 * X @ (X@w + b - y)
+- (2/n) * X @ (X.T @ w - y)
+correct_answer: (2/n) * X.T @ (X@w + b - y)
+snippet: |
+  import numpy as np
+
+  rng = np.random.default_rng(0)
+  X = rng.normal(size=(7, 3))
+  w = rng.normal(size=3)
+  b = 0.5
+  y = rng.normal(size=7)
+  n = X.shape[0]
+
+
+  def loss(w_, b_):
+      return float(np.mean((X @ w_ + b_ - y) ** 2))
+
+
+  # Rumus yang diklaim opsi jawaban.
+  dw_rumus = (2 / n) * X.T @ (X @ w + b - y)
+
+  # Gradien numerik sebagai wasit independen.
+  eps = 1e-6
+  dw_numerik = np.array(
+      [
+          (loss(w + eps * np.eye(3)[i], b) - loss(w - eps * np.eye(3)[i], b)) / (2 * eps)
+          for i in range(3)
+      ]
+  )
+expression: bool(np.allclose(dw_rumus, dw_numerik, rtol=1e-5, atol=1e-8))
+expected_value: 'True'

@@ -1,10 +1,26 @@
 id: n006_probe_01
 node_id: n006_explicit_status_code
 type: predict_output
-question: Route DELETE dideklarasikan `status_code=204` dan handler-nya `return None`. Apa isi body respons?
+question: Route DELETE dideklarasikan `status_code=204` dan handler-nya `return None`.
+  Apa isi body respons?
 options:
-  - 'null'
-  - '{}'
-  - kosong (0 byte)
-  - '{"detail": "No Content"}'
+- 'null'
+- '{}'
+- kosong (0 byte)
+- '{"detail": "No Content"}'
 correct_answer: kosong (0 byte)
+snippet: |
+  from fastapi import FastAPI
+  from fastapi.testclient import TestClient
+
+  app = FastAPI()
+
+
+  @app.delete("/items/{item_id}", status_code=204)
+  def delete_item(item_id: int):
+      return None
+
+
+  client = TestClient(app)
+expression: len(client.delete("/items/1").content)
+expected_value: '0'

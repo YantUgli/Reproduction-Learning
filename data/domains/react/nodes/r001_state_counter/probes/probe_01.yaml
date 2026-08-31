@@ -1,10 +1,37 @@
 id: r001_probe_01
 node_id: r001_state_counter
 type: predict_output
-question: "Handler ditulis `onClick={setCount(count + 1)}` (tanpa arrow function). Apa yang terjadi saat komponen di-render?"
+question: Handler ditulis `onClick={setCount(count + 1)}` (tanpa arrow function).
+  Apa yang terjadi saat komponen di-render?
 options:
-  - "setCount dipanggil saat render, memicu render ulang tanpa henti"
-  - "Tidak terjadi apa-apa sampai tombol diklik"
-  - "React menunda pemanggilan sampai klik pertama"
-  - "Terjadi error sintaks saat kompilasi JSX"
-correct_answer: "setCount dipanggil saat render, memicu render ulang tanpa henti"
+- setCount dipanggil saat render, memicu render ulang tanpa henti
+- Tidak terjadi apa-apa sampai tombol diklik
+- React menunda pemanggilan sampai klik pertama
+- Terjadi error sintaks saat kompilasi JSX
+correct_answer: setCount dipanggil saat render, memicu render ulang tanpa henti
+snippet: |
+  import { useState } from "react";
+  import { render } from "@testing-library/react";
+
+  function HandlerTanpaArrow() {
+    const [count, setCount] = useState(0);
+    // BUG yang ditanyakan: setCount dipanggil saat render, bukan saat klik.
+    return <button onClick={setCount(count + 1)}>Jumlah: {count}</button>;
+  }
+
+  export function apaYangTerjadiSaatRender() {
+    const errorAsli = console.error;
+    console.error = () => {};
+    try {
+      render(<HandlerTanpaArrow />);
+      return "render biasa";
+    } catch (e) {
+      return String(e && e.message).includes("Too many re-renders")
+        ? "render ulang tanpa henti"
+        : "error lain";
+    } finally {
+      console.error = errorAsli;
+    }
+  }
+expression: apaYangTerjadiSaatRender()
+expected_value: render ulang tanpa henti

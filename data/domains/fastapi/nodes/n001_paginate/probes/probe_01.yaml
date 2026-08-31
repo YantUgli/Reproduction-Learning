@@ -1,10 +1,17 @@
 id: n001_probe_01
 node_id: n001_paginate
 type: predict_output
-question: "paginate([10, 20, 30, 40, 50], 2, 2) mengembalikan apa?"
+question: paginate([10, 20, 30, 40, 50], 2, 2) mengembalikan apa?
 options:
-  - "[10, 20]"
-  - "[30, 40]"
-  - "[20, 30]"
-  - "[]"
-correct_answer: "[30, 40]"
+- '[10, 20]'
+- '[30, 40]'
+- '[20, 30]'
+- '[]'
+correct_answer: '[30, 40]'
+snippet: |
+  def paginate(items, page, per_page):
+      if page < 1 or per_page < 1:
+          raise ValueError("page dan per_page harus >= 1")
+      start = (page - 1) * per_page
+      return list(items)[start : start + per_page]
+expression: paginate([10, 20, 30, 40, 50], 2, 2)

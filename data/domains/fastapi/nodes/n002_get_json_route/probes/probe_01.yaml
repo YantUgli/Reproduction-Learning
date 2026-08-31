@@ -1,6 +1,24 @@
 id: n002_probe_01
 node_id: n002_get_json_route
 type: predict_output
-question: "GET ke route yang mengembalikan dict tanpa error, status code-nya?"
-options: ["200", "201", "204", "404"]
-correct_answer: "200"
+question: GET ke route yang mengembalikan dict tanpa error, status code-nya?
+options:
+- '200'
+- '201'
+- '204'
+- '404'
+correct_answer: '200'
+snippet: |
+  from fastapi import FastAPI
+  from fastapi.testclient import TestClient
+
+  app = FastAPI()
+
+
+  @app.get("/status")
+  def read_status():
+      return {"service": "orders", "ok": True}
+
+
+  client = TestClient(app)
+expression: client.get("/status").status_code

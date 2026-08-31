@@ -1,10 +1,33 @@
 id: n010_probe_01
 node_id: n010_response_model_filter
 type: predict_output
-question: Handler `return user` (punya username, password, email) tapi route-nya `response_model=UserOut` yang hanya mendeklarasikan username & email. Body responsnya?
+question: Handler `return user` (punya username, password, email) tapi route-nya `response_model=UserOut`
+  yang hanya mendeklarasikan username & email. Body responsnya?
 options:
-  - '{"username": "ada", "password": "s3cret", "email": "ada@example.com"}'
-  - '{"username": "ada", "email": "ada@example.com"}'
-  - '{"username": "ada"}'
-  - 500 Internal Server Error
+- '{"username": "ada", "password": "s3cret", "email": "ada@example.com"}'
+- '{"username": "ada", "email": "ada@example.com"}'
+- '{"username": "ada"}'
+- 500 Internal Server Error
 correct_answer: '{"username": "ada", "email": "ada@example.com"}'
+snippet: |
+  import json
+
+  from fastapi import FastAPI
+  from fastapi.testclient import TestClient
+  from pydantic import BaseModel
+
+  app = FastAPI()
+
+
+  class UserOut(BaseModel):
+      username: str
+      email: str
+
+
+  @app.get("/me", response_model=UserOut)
+  def read_me():
+      return {"username": "ada", "password": "s3cret", "email": "ada@example.com"}
+
+
+  client = TestClient(app)
+expression: json.dumps(client.get("/me").json())

@@ -1,10 +1,36 @@
 id: r003_probe_01
 node_id: r003_conditional_list
 type: predict_output
-question: "Daftar berisi 3 item dirender dengan `items.map((it) => <li>{it}</li>)` tanpa prop `key`. Apa akibatnya?"
+question: Daftar berisi 3 item dirender dengan `items.map((it) => <li>{it}</li>)`
+  tanpa prop `key`. Apa akibatnya?
 options:
-  - "Tetap tampil 3 <li>, tapi React memberi peringatan key di console"
-  - "Hanya item pertama yang tampil"
-  - "React melempar error dan komponen gagal render"
-  - "Item tampil terbalik urutannya"
-correct_answer: "Tetap tampil 3 <li>, tapi React memberi peringatan key di console"
+- Tetap tampil 3 <li>, tapi React memberi peringatan key di console
+- Hanya item pertama yang tampil
+- React melempar error dan komponen gagal render
+- Item tampil terbalik urutannya
+correct_answer: Tetap tampil 3 <li>, tapi React memberi peringatan key di console
+snippet: |
+  import { render, screen } from "@testing-library/react";
+
+  function DaftarTanpaKey({ items }) {
+    return (
+      <ul>
+        {items.map((it) => (
+          <li>{it}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  export function jumlahLiYangTampil() {
+    const errorAsli = console.error;
+    console.error = () => {};
+    try {
+      render(<DaftarTanpaKey items={["a", "b", "c"]} />);
+      return screen.getAllByRole("listitem").length;
+    } finally {
+      console.error = errorAsli;
+    }
+  }
+expression: jumlahLiYangTampil()
+expected_value: '3'

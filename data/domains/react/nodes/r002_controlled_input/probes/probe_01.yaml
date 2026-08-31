@@ -1,10 +1,34 @@
 id: r002_probe_01
 node_id: r002_controlled_input
 type: spot_bug
-question: "Sebuah input ditulis `<input value={name} />` TANPA onChange. Apa perilakunya saat user mengetik?"
+question: Sebuah input ditulis `<input value={name} />` TANPA onChange. Apa perilakunya
+  saat user mengetik?
 options:
-  - "Teks yang diketik tidak pernah muncul — nilainya terkunci ke state"
-  - "Teks muncul normal dan state ikut ter-update"
-  - "Teks muncul, tapi state tetap kosong"
-  - "React melempar error saat mengetik"
-correct_answer: "Teks yang diketik tidak pernah muncul — nilainya terkunci ke state"
+- Teks yang diketik tidak pernah muncul — nilainya terkunci ke state
+- Teks muncul normal dan state ikut ter-update
+- Teks muncul, tapi state tetap kosong
+- React melempar error saat mengetik
+correct_answer: Teks yang diketik tidak pernah muncul — nilainya terkunci ke state
+snippet: |
+  import { useState } from "react";
+  import { render, screen, fireEvent } from "@testing-library/react";
+
+  function InputTanpaOnChange() {
+    const [name] = useState("");
+    return <input aria-label="nama" value={name} />;
+  }
+
+  export function nilaiSetelahMengetik() {
+    const errorAsli = console.error;
+    console.error = () => {};
+    try {
+      render(<InputTanpaOnChange />);
+      const input = screen.getByLabelText("nama");
+      fireEvent.change(input, { target: { value: "budi" } });
+      return input.value === "budi" ? "ikut berubah" : "terkunci";
+    } finally {
+      console.error = errorAsli;
+    }
+  }
+expression: nilaiSetelahMengetik()
+expected_value: terkunci

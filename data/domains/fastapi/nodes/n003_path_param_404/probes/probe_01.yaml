@@ -1,6 +1,29 @@
 id: n003_probe_01
 node_id: n003_path_param_404
 type: predict_output
-question: "Route mengangkat HTTPException(status_code=404) saat id tak ada. Status responsnya?"
-options: ["200", "400", "404", "500"]
-correct_answer: "404"
+question: Route mengangkat HTTPException(status_code=404) saat id tak ada. Status
+  responsnya?
+options:
+- '200'
+- '400'
+- '404'
+- '500'
+correct_answer: '404'
+snippet: |
+  from fastapi import FastAPI, HTTPException
+  from fastapi.testclient import TestClient
+
+  app = FastAPI()
+
+  ITEMS = {1: "pena"}
+
+
+  @app.get("/items/{item_id}")
+  def read_item(item_id: int):
+      if item_id not in ITEMS:
+          raise HTTPException(status_code=404, detail="item tidak ada")
+      return {"name": ITEMS[item_id]}
+
+
+  client = TestClient(app)
+expression: client.get("/items/99").status_code

@@ -1,10 +1,32 @@
 id: n012_probe_01
 node_id: n012_header_param
 type: predict_output
-question: 'Param dideklarasikan `x_token: str = Header()`. Nama header HTTP yang harus dikirim klien agar terbaca?'
+question: 'Param dideklarasikan `x_token: str = Header()`. Nama header HTTP yang harus
+  dikirim klien agar terbaca?'
 options:
-  - x_token
-  - token
-  - x-token
-  - X_TOKEN
+- x_token
+- token
+- x-token
+- X_TOKEN
 correct_answer: x-token
+snippet: |
+  from fastapi import FastAPI, Header
+  from fastapi.testclient import TestClient
+
+  app = FastAPI()
+
+
+  @app.get("/whoami")
+  def whoami(x_token: str = Header()):
+      return {"token": x_token}
+
+
+  client = TestClient(app)
+
+
+  def nama_header_yang_terbaca():
+      for nama in ("x_token", "token", "x-token", "X_TOKEN"):
+          if client.get("/whoami", headers={nama: "abc"}).status_code == 200:
+              return nama
+      return "(tak ada yang terbaca)"
+expression: nama_header_yang_terbaca()

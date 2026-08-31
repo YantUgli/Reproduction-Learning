@@ -1,10 +1,25 @@
 id: n008_probe_01
 node_id: n008_path_param_constraint
 type: predict_output
-question: '`item_id` dideklarasikan `int = Path(gt=0)`. Request GET /items/0 menghasilkan status berapa?'
+question: '`item_id` dideklarasikan `int = Path(gt=0)`. Request GET /items/0 menghasilkan
+  status berapa?'
 options:
-  - '200'
-  - '400'
-  - '404'
-  - '422'
+- '200'
+- '400'
+- '404'
+- '422'
 correct_answer: '422'
+snippet: |
+  from fastapi import FastAPI, Path as PathParam
+  from fastapi.testclient import TestClient
+
+  app = FastAPI()
+
+
+  @app.get("/items/{item_id}")
+  def read_item(item_id: int = PathParam(gt=0)):
+      return {"item_id": item_id}
+
+
+  client = TestClient(app)
+expression: client.get("/items/0").status_code
