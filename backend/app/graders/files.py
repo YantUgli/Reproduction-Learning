@@ -15,6 +15,19 @@ from app.models import ChallengeInstance
 from app.services.node_loader import find_instance_file
 
 
+def repo_pointer(path: Path) -> str:
+    """Path -> pointer seperti yang disimpan di `hidden_test_path`.
+
+    Relatif ke repo bila bisa, absolut bila tidak (mis. `data/` yang ditunjuk ke luar
+    repo saat test, atau direktori artifact di tmp). Selalu POSIX supaya pointer di DB
+    tak berubah bentuk tergantung OS penulisnya.
+    """
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def hidden_test_path(instance: ChallengeInstance) -> Path:
     return REPO_ROOT / instance.hidden_test_path
 
@@ -60,7 +73,5 @@ def editor_language(instance: ChallengeInstance) -> str:
 def read_hidden_test(instance: ChallengeInstance) -> str:
     path = hidden_test_path(instance)
     if not path.exists():
-        raise FileNotFoundError(
-            f"hidden_test tidak ditemukan: {path} (instance {instance.id})"
-        )
+        raise FileNotFoundError(f"hidden_test tidak ditemukan: {path} (instance {instance.id})")
     return path.read_text(encoding="utf-8")

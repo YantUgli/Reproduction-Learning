@@ -25,7 +25,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.claude import artifacts, jobs, review_queue
-from app.claude.artifacts import JobStatus, read_job
+from app.claude.artifacts import Job, JobStatus, read_job
 from app.claude.runner import CliClaudeRunner, RunResult
 from app.config import DATA_DIR
 from app.models import (
@@ -36,6 +36,7 @@ from app.models import (
     ScheduleItem,
     SkillHypothesis,
 )
+from app.services import grounding
 from app.services.attempt_service import submit_attempt
 from app.services.node_loader import load_domain_into_db
 from app.services.scaffold import pick_probe
@@ -56,6 +57,21 @@ GOOD_TEST = (
     '    assert client.get("/health").json() == {"service": "billing", "ok": True}\n'
 )
 STARTER = "from fastapi import FastAPI\n\napp = FastAPI()\n\n# TODO: route GET sesuai prompt.\n"
+#: Probe buatan AI WAJIB membawa snippet yang MENGHASILKAN jawabannya (M7 langkah 2):
+#: sejak approve manusia dicabut, tak ada lagi yang membaca kuncinya sebelum Bryant.
+PROBE_SNIPPET = """from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+
+@app.get("/health")
+def read_health():
+    return {"ok": True}
+
+
+client = TestClient(app)
+"""
 PROBE = {
     "id": "n002_probe_02",
     "node_id": NODE,
@@ -63,6 +79,8 @@ PROBE = {
     "question": "GET /health mengembalikan status berapa?",
     "options": ["404", "200"],
     "correct_answer": "200",
+    "snippet": PROBE_SNIPPET,
+    "expression": 'client.get("/health").status_code',
 }
 
 CORRECT_N002 = (
@@ -116,6 +134,12 @@ def env(tmp_path, monkeypatch) -> Env:
     monkeypatch.setattr(review_queue, "DATA_DIR", data_dir)
     monkeypatch.setattr(artifacts, "ARTIFACTS_DIR", tmp_path / "artifacts")
 
+    # Snapshot sumber untuk grounding verbatim (M7 langkah 3).
+    snapshots = tmp_path / "sources"
+    snapshots.mkdir()
+    (snapshots / "fastapi_docs_first_steps.md").write_text(SNAPSHOT_TEXT, encoding="utf-8")
+    monkeypatch.setattr(grounding, "SNAPSHOT_DIR", snapshots)
+
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -136,7 +160,19 @@ def r4_files(*, reference: str = GOOD_REFERENCE, starter: str = STARTER, probe=N
     }
 
 
-def r3_files() -> dict:
+#: Isi snapshot sumber palsu untuk test. Yang diuji adalah MEKANISME pencocokan
+#: kutipan, bukan isi dokumentasi FastAPI — jadi snapshot-nya dibuat di tmp_path,
+#: tak pernah di `data/` (snapshot sungguhan adalah salinan verbatim sumber asli,
+#: dan itu pekerjaan authoring, bukan fixture test).
+SNAPSHOT_TEXT = (
+    "# FastAPI - First Steps\n\n"
+    "You declare a path operation by decorating a function with @app.get(...).\n"
+    "The function can return a dict, and FastAPI will convert it to JSON.\n"
+)
+QUOTE_ASLI = "The function can return a dict, and FastAPI will convert it to JSON."
+
+
+def r3_files(*, quote: str = QUOTE_ASLI, source_ref_id: str = "fastapi_docs_first_steps") -> dict:
     return {
         "explanation.md": "Handler wajib mengembalikan dict agar FastAPI menyerialisasinya.",
         "worked_example.py": "# contoh beranotasi\n",
@@ -144,9 +180,10 @@ def r3_files() -> dict:
             {
                 "citations": [
                     {
-                        "source_ref_id": "fastapi_docs_first_steps",
+                        "source_ref_id": source_ref_id,
                         "locator": "First Steps",
                         "claim": "route dideklarasikan lewat dekorator",
+                        "quote": quote,
                     }
                 ]
             }
@@ -171,6 +208,20 @@ def r2_files(node_id: str = NODE, confidence: float = 0.8) -> dict:
     }
 
 
+def _assert_promoted(job_id: str) -> Job:
+    """Sejak M7 promosi terjadi OTOMATIS di dalam `execute_job` — tak ada klik manusia.
+
+    Helper ini menggantikan pemanggilan `review_queue.approve(...)` di test-test lama.
+    Ia bukan sekadar penghapus baris: ia menuntut job benar-benar sudah masuk sistem,
+    jadi kalau promosi otomatis diam-diam berhenti bekerja, test-test ini merah.
+    """
+    job = read_job(job_id)
+    assert job.status == JobStatus.approved.value, (
+        f"job {job_id} tak dipromosikan otomatis (status {job.status}): {job.error}"
+    )
+    return job
+
+
 def _fail_once(env: Env) -> Attempt:
     """Satu attempt GAGAL — prasyarat R3 (materi hanya untuk kegagalan nyata)."""
     instance = env.session.exec(
@@ -189,17 +240,37 @@ def _fail_once(env: Env) -> Attempt:
 
 
 # --------------------------------------------------------------------------- #
-# R4 — gate otomatis + approve
+# R4 — gerbang mesin + promosi otomatis
 # --------------------------------------------------------------------------- #
-def test_ready_job_has_not_touched_system(env: Env):
+def test_artifact_lolos_gerbang_masuk_sistem_tanpa_klik_manusia(env: Env):
+    """Inti M7: Bryant mendapat soal baru tanpa siapa pun menekan approve.
+
+    Yang menggantikan mata manusia bukan kelonggaran, melainkan gerbang yang
+    dijalankan lebih dulu (triad eksekusi + probe dijalankan) — lihat test-test
+    penolakan di bawah, yang membuktikan gerbang itu benar-benar bisa merah.
+    """
+    job = jobs.trigger_r4(env.session, node_id=NODE)
+    before = len(env.session.exec(select(ChallengeInstance)).all())
+
+    done = jobs.execute_job(job.id, env.session, runner=FakeRunner(r4_files()))
+
+    assert done.status == JobStatus.approved.value
+    assert done.gate["passed"] is True
+    assert done.gate["probe_verified"] is True
+    assert (env.node_dir() / "instances" / "variant_c").exists()
+    assert len(env.session.exec(select(ChallengeInstance)).all()) == before + 1
+
+
+def test_tanpa_auto_promote_alurnya_kembali_berhenti_di_ready(env: Env, monkeypatch):
+    """Kill switch M7. Jaminan M5 harus tetap UTUH saat promosi otomatis dimatikan:
+    artifact `ready` sekalipun belum menyentuh `data/` maupun DB."""
+    monkeypatch.setattr(jobs, "CLAUDE_AUTO_PROMOTE", False)
     job = jobs.trigger_r4(env.session, node_id=NODE)
     before = len(env.session.exec(select(ChallengeInstance)).all())
 
     done = jobs.execute_job(job.id, env.session, runner=FakeRunner(r4_files()))
 
     assert done.status == JobStatus.ready.value
-    assert done.gate["passed"] is True
-    # Belum ada apa pun yang masuk sistem — approve-lah yang menulis.
     assert not (env.node_dir() / "instances" / "variant_c").exists()
     assert len(env.session.exec(select(ChallengeInstance)).all()) == before
 
@@ -208,12 +279,12 @@ def test_approve_promotes_variant_and_probe(env: Env):
     job = jobs.trigger_r4(env.session, node_id=NODE)
     jobs.execute_job(job.id, env.session, runner=FakeRunner(r4_files()))
 
-    promotion = review_queue.approve(env.session, job.id)
+    promoted = _assert_promoted(job.id)
 
     variant_dir = env.node_dir() / "instances" / "variant_c"
     assert (variant_dir / "hidden_test.py").exists()
     assert (env.node_dir() / "probes" / "n002_probe_02.yaml").exists()
-    assert promotion.db_effect["variant_label"] == "variant_c"
+    assert promoted.summary["variant_label"] == "variant_c"
     assert env.session.get(ChallengeInstance, f"{NODE}__variant_c") is not None
     assert env.session.get(ComprehensionProbe, "n002_probe_02") is not None
     assert read_job(job.id).status == JobStatus.approved.value
@@ -249,6 +320,49 @@ def test_starter_that_already_passes_is_rejected(env: Env):
     assert "starter_code" in done.gate["reason"]
 
 
+def test_probe_dengan_kunci_salah_ditolak_gate(env: Env):
+    """Kunci probe DIJALANKAN (M7). Sebelum ini, `correct_answer` cuma perlu ADA di
+    `options` — probe berkunci salah lolos mulus lalu menghukum Bryant karena benar."""
+    # Snippet-nya benar (200), tapi kuncinya diklaim 404.
+    salah = {**PROBE, "correct_answer": "404"}
+    job = jobs.trigger_r4(env.session, node_id=NODE)
+
+    done = jobs.execute_job(job.id, env.session, runner=FakeRunner(r4_files(probe=salah)))
+
+    assert done.status == JobStatus.rejected.value
+    assert "probe ditolak" in done.gate["reason"]
+    assert not (env.node_dir() / "probes" / "n002_probe_02.yaml").exists()
+
+
+def test_probe_tanpa_snippet_ditolak_gate(env: Env):
+    """Tanpa manusia di jalur, probe yang tak bisa dibuktikan mesin = probe tak terperiksa."""
+    tanpa_snippet = {k: v for k, v in PROBE.items() if k not in ("snippet", "expression")}
+    job = jobs.trigger_r4(env.session, node_id=NODE)
+
+    done = jobs.execute_job(job.id, env.session, runner=FakeRunner(r4_files(probe=tanpa_snippet)))
+
+    assert done.status == JobStatus.rejected.value
+    assert "snippet" in done.gate["reason"]
+
+
+def test_probe_ai_tak_boleh_pakai_expected_value(env: Env):
+    """Bentuk prosa+`expected_value` menyisakan jembatan yang ditulis manusia. Probe
+    buatan AI tak punya penulis yang bisa ditanya, jadi bentuk itu ditolak di sini —
+    gate mesin sengaja LEBIH ketat daripada gerbang authoring tulisan tangan."""
+    prosa = {
+        **PROBE,
+        "options": ["berhasil (200)", "tak ditemukan (404)"],
+        "correct_answer": "berhasil (200)",
+        "expected_value": "200",
+    }
+    job = jobs.trigger_r4(env.session, node_id=NODE)
+
+    done = jobs.execute_job(job.id, env.session, runner=FakeRunner(r4_files(probe=prosa)))
+
+    assert done.status == JobStatus.rejected.value
+    assert "expected_value" in done.gate["reason"]
+
+
 def test_contract_violation_never_reaches_review(env: Env):
     bad_probe = {**PROBE, "correct_answer": "500"}
     job = jobs.trigger_r4(env.session, node_id=NODE)
@@ -264,8 +378,9 @@ def test_approve_refuses_job_that_is_not_ready(env: Env, status: str):
     job = jobs.trigger_r4(env.session, node_id=NODE)
     artifacts.set_status(job, JobStatus(status), error="x")
 
+    # Promosi tetap menolak job yang belum lolos gerbang — otomatis maupun manual.
     with pytest.raises(review_queue.PromotionError, match="ready"):
-        review_queue.approve(env.session, job.id)
+        review_queue.promote(env.session, job.id)
 
 
 def test_second_probe_becomes_reachable_after_promotion(env: Env):
@@ -273,7 +388,7 @@ def test_second_probe_becomes_reachable_after_promotion(env: Env):
     pemilihan probe bergilir."""
     job = jobs.trigger_r4(env.session, node_id=NODE)
     jobs.execute_job(job.id, env.session, runner=FakeRunner(r4_files()))
-    review_queue.approve(env.session, job.id)
+    _assert_promoted(job.id)
 
     seen = set()
     for _ in range(4):
@@ -293,14 +408,13 @@ def test_r3_requires_a_real_failure(env: Env):
         jobs.trigger_r3(env.session, node_id=NODE)
 
 
-def test_r3_approve_writes_explanation_with_sources(env: Env):
+def test_r3_writes_explanation_with_sources(env: Env):
     _fail_once(env)
     job = jobs.trigger_r3(env.session, node_id=NODE)
     done = jobs.execute_job(job.id, env.session, runner=FakeRunner(r3_files()))
-    assert done.status == JobStatus.ready.value
-    assert not (env.node_dir() / "explanation.md").exists()  # belum, sebelum approve
 
-    review_queue.approve(env.session, job.id)
+    assert done.status == JobStatus.approved.value
+    _assert_promoted(job.id)
 
     text = (env.node_dir() / "explanation.md").read_text(encoding="utf-8")
     assert "## Sumber" in text
@@ -329,9 +443,10 @@ def test_r2_hypotheses_enter_unverified_and_do_not_move_status(env: Env):
     job = jobs.trigger_r2(env.session, repo_path=str(env.data_dir), node_ids=[NODE])
     jobs.execute_job(job.id, env.session, runner=FakeRunner(r2_files(confidence=0.99)))
 
-    assert env.session.exec(select(SkillHypothesis)).all() == []  # belum di-approve
-
-    review_queue.approve(env.session, job.id)
+    # Hipotesis kini masuk otomatis (M7) — yang TIDAK berubah: ia tetap `unverified`
+    # dan tetap tak menggerakkan status node. Otomasi menyentuh siapa yang meng-approve
+    # KONTEN, tak pernah siapa yang memutuskan MASTERY (§1.2).
+    _assert_promoted(job.id)
 
     rows = env.session.exec(select(SkillHypothesis)).all()
     assert [r.status for r in rows] == [HypothesisStatus.unverified.value]
@@ -343,7 +458,7 @@ def test_r2_hypotheses_enter_unverified_and_do_not_move_status(env: Env):
 def test_only_execution_confirms_or_refutes_hypothesis(env: Env):
     job = jobs.trigger_r2(env.session, repo_path=str(env.data_dir), node_ids=[NODE])
     jobs.execute_job(job.id, env.session, runner=FakeRunner(r2_files()))
-    review_queue.approve(env.session, job.id)
+    _assert_promoted(job.id)
 
     verify = env.session.exec(
         select(ChallengeInstance).where(ChallengeInstance.node_id == NODE)
@@ -362,7 +477,7 @@ def test_only_execution_confirms_or_refutes_hypothesis(env: Env):
     # Hipotesis baru + attempt gagal → dibantah.
     job2 = jobs.trigger_r2(env.session, repo_path=str(env.data_dir), node_ids=[NODE])
     jobs.execute_job(job2.id, env.session, runner=FakeRunner(r2_files()))
-    review_queue.approve(env.session, job2.id)
+    _assert_promoted(job2.id)
     submit_attempt(
         env.session,
         node_id=NODE,
@@ -379,7 +494,7 @@ def test_scaffolded_practice_is_not_evidence(env: Env):
     """Attempt `acquisition` (scaffold masih di layar) tak boleh mengonfirmasi apa pun."""
     job = jobs.trigger_r2(env.session, repo_path=str(env.data_dir), node_ids=[NODE])
     jobs.execute_job(job.id, env.session, runner=FakeRunner(r2_files()))
-    review_queue.approve(env.session, job.id)
+    _assert_promoted(job.id)
 
     teaching = env.session.exec(
         select(ChallengeInstance).where(ChallengeInstance.node_id == NODE)

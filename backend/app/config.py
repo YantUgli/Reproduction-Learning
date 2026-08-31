@@ -13,6 +13,7 @@ def _env_flag(name: str, default: bool) -> bool:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
+
 # Root repo = dua tingkat di atas file ini (backend/app/config.py -> repo/).
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -92,6 +93,13 @@ ARTIFACTS_DIR = REPO_ROOT / "artifacts"
 
 # Kill switch. Dimatikan → endpoint trigger balas 503 dan loop inti tak tersentuh.
 CLAUDE_INTEGRATION_ENABLED = _env_flag("CLAUDE_INTEGRATION_ENABLED", True)
+
+# Promosi OTOMATIS artifact yang lolos seluruh gerbang mesin (M7 langkah 9).
+# Sampai M6 tiap artifact berhenti di `ready` menunggu approve Isyah; sejak
+# §7 2026-08-31 gerbang mesin yang memutuskan, dan peninjauan manusia pindah ke
+# belakang (audit + pensiun). Dimatikan -> alurnya kembali seperti M5: artifact
+# berhenti di `ready` dan menunggu klik manusia di `/authoring`.
+CLAUDE_AUTO_PROMOTE = _env_flag("CLAUDE_AUTO_PROMOTE", True)
 
 # Binary Claude Code headless. Tak ada di PATH → job `failed` dengan pesan jelas,
 # bukan exception yang merembet ke request UI.

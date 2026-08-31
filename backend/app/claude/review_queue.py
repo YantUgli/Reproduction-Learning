@@ -30,7 +30,12 @@ from app.config import DATA_DIR
 from app.models import HypothesisSource, HypothesisStatus, Node, SkillHypothesis
 from app.services.node_loader import assemble_node, load_domain_into_db
 
-_VARIANT_FILES = ("prompt.md", "starter_code.py", "reference_solution.py", "hidden_test.py")
+#: Berkas varian yang ditulis saat promosi. Ekstensi kode diambil dari artifact
+#: (`.py` FastAPI/ML, `.jsx` React), bukan diasumsikan — versi M5 meng-hardcode `.py`
+#: sehingga varian React akan mendarat dengan ekstensi yang salah dan node-nya jadi
+#: tak sah (kebocoran yang sama dengan gate R4, ditutup di M7 langkah 1).
+_PROMPT_FILE = "prompt.md"
+_CODE_STEMS = ("starter_code", "reference_solution", "hidden_test")
 
 
 class PromotionError(ValueError):
@@ -66,7 +71,14 @@ def _require_reviewable(job: Job) -> None:
 # --------------------------------------------------------------------------- #
 # Approve / reject
 # --------------------------------------------------------------------------- #
-def approve(session: Session, job_id: str) -> Promotion:
+def promote(session: Session, job_id: str) -> Promotion:
+    """Masukkan artifact ke sistem (`data/` + DB).
+
+    Sejak M7 ini dipanggil OTOMATIS oleh `jobs.execute_job` begitu seluruh gerbang
+    mesin lolos — bukan lagi oleh klik manusia. `approve()` tetap ada sebagai jalur
+    manual untuk kasus yang perlu ditangani tangan; keduanya menjalankan pemeriksaan
+    yang sama, jadi tak ada jalur masuk yang lebih longgar daripada yang lain.
+    """
     job = read_job(job_id)
     _require_reviewable(job)
 
@@ -80,6 +92,11 @@ def approve(session: Session, job_id: str) -> Promotion:
     job.summary = {**job.summary, "promotion": promotion.written_paths, **promotion.db_effect}
     set_status(job, JobStatus.approved)
     return promotion
+
+
+#: Jalur manual. Namanya dipertahankan karena router & test M5 memakainya, dan
+#: karena "approve" masih tepat untuk tindakan yang memang dilakukan manusia.
+approve = promote
 
 
 def reject(job_id: str, reason: str) -> Job:
@@ -139,14 +156,21 @@ def _promote_r4(session: Session, job: Job) -> Promotion:
 
     variant_dir.mkdir(parents=True)
     probe_path.parent.mkdir(parents=True, exist_ok=True)
-    written = [_rel(variant_dir / f) for f in _VARIANT_FILES] + [_rel(probe_path)]
+    ext = artifact.file_ext
+    isi = {
+        _PROMPT_FILE: artifact.prompt_md,
+        f"starter_code{ext}": artifact.starter_code,
+        f"reference_solution{ext}": artifact.reference_solution,
+        f"hidden_test{ext}": artifact.hidden_test,
+    }
+    if artifact.expected_json.strip():
+        # Node ML membawa toleransi numeriknya di `expected.json` (M6) — tanpa ini
+        # varian barunya tak bisa dinilai grader `value_assert`.
+        isi["expected.json"] = artifact.expected_json
+    written = [_rel(variant_dir / f) for f in isi] + [_rel(probe_path)]
     try:
-        (variant_dir / "prompt.md").write_text(artifact.prompt_md, encoding="utf-8")
-        (variant_dir / "starter_code.py").write_text(artifact.starter_code, encoding="utf-8")
-        (variant_dir / "reference_solution.py").write_text(
-            artifact.reference_solution, encoding="utf-8"
-        )
-        (variant_dir / "hidden_test.py").write_text(artifact.hidden_test, encoding="utf-8")
+        for nama, teks in isi.items():
+            (variant_dir / nama).write_text(teks, encoding="utf-8")
         probe_path.write_text(
             yaml.dump(
                 # mode="json": `type` adalah StrEnum, dan yaml tak bisa merepresentasikan

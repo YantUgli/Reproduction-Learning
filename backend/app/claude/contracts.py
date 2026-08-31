@@ -8,7 +8,7 @@ Bentuk file per peran (sengaja file terpisah, bukan satu JSON raksasa: Isyah har
 bisa membuka artifact-nya langsung dan membacanya seperti kode):
 
     r3/  explanation.md      + citations.json
-    r4/  variant/{prompt.md,starter_code.py,reference_solution.py,hidden_test.py}
+    r4/  variant/{prompt.md,starter_code.*,reference_solution.*,hidden_test.*}
          probe.yaml          + meta.json
     r2/  hypotheses.json
 
@@ -32,7 +32,26 @@ from app.config import EXPLANATION_MAX_CHARS
 from app.services.node_schema import ProbeYaml
 
 _VARIANT_RE = re.compile(r"^variant_[a-z0-9_]+$")
-_SOLUTION_IMPORT_RE = re.compile(r"^\s*(from\s+solution\s+import|import\s+solution)", re.MULTILINE)
+
+#: Aturan "hidden test benar-benar menguji submisi user", per bahasa. Kunci = ekstensi
+#: berkas hidden test artifact (ditemukan dari NAMA DASAR, bukan diasumsikan `.py`) —
+#: sama seperti `graders/files.py`, supaya menambah domain berarti menambah satu baris
+#: di sini, bukan cabang `if domain == ...`.
+_TEST_RULES: dict[str, tuple[re.Pattern, re.Pattern, str]] = {
+    ".py": (
+        re.compile(r"^\s*(from\s+solution\s+import|import\s+solution)", re.MULTILINE),
+        re.compile(r"def test_"),
+        "meng-import modul `solution` (kode user disimpan sebagai solution.py) "
+        "dan punya fungsi `test_*`",
+    ),
+    ".jsx": (
+        re.compile(r"""from\s+["']\./solution\.jsx["']"""),
+        re.compile(r"\b(test|it)\s*\("),
+        'meng-import "./solution.jsx" (kode user disimpan sebagai solution.jsx) '
+        "dan punya blok `test(...)`/`it(...)`",
+    ),
+}
+_DEFAULT_TEST_EXT = ".py"
 
 
 class ArtifactError(ValueError):
@@ -48,6 +67,11 @@ class Citation(BaseModel):
     source_ref_id: str
     locator: str = ""  # bagian/anchor spesifik di sumber (opsional tapi dianjurkan)
     claim: str  # klaim yang disitasi — supaya Isyah bisa mengecek, bukan menebak
+    #: Potongan VERBATIM dari sumber yang menopang klaim ini. Dicocokkan sebagai
+    #: substring terhadap `data/sources/<id>.md` (lihat `services/grounding.py`).
+    #: Sebelum M7 sitasi hanya perlu menunjuk sumber yang ADA — itu membuktikan
+    #: sumbernya terdaftar, bukan bahwa klaimnya ditopang.
+    quote: str = ""
 
 
 class ExplanationArtifact(BaseModel):
@@ -96,6 +120,11 @@ class ChallengeArtifact(BaseModel):
     reference_solution: str
     hidden_test: str
     probe: ProbeYaml
+    #: Ekstensi berkas instance (".py" FastAPI/ML, ".jsx" React). Diturunkan dari
+    #: berkas yang BENAR-BENAR ditulis Claude Code, bukan dari `domain_id`.
+    file_ext: str = _DEFAULT_TEST_EXT
+    #: `expected.json` — hanya dipakai grader `value_assert` (ML). Kosong untuk domain lain.
+    expected_json: str = ""
 
     @field_validator("variant_label")
     @classmethod
@@ -111,17 +140,25 @@ class ChallengeArtifact(BaseModel):
             raise ValueError("field wajib ini kosong")
         return v
 
-    @field_validator("hidden_test")
-    @classmethod
-    def _test_imports_solution(cls, v: str) -> str:
-        if not _SOLUTION_IMPORT_RE.search(v):
+    @model_validator(mode="after")
+    def _test_references_solution(self):
+        """Hidden test WAJIB benar-benar memanggil submisi user.
+
+        Ini murah tapi menutup satu kegagalan mahal: test yang tak pernah menyentuh
+        `solution` bisa hijau di apa saja, termasuk di berkas kosong. Pemeriksaan
+        eksekusinya sendiri (triad) ada di `services/quality_gate.py`; yang di sini
+        cuma memastikan bentuknya masuk akal sebelum kita membayar ongkos eksekusi.
+        """
+        rule = _TEST_RULES.get(self.file_ext)
+        if rule is None:
             raise ValueError(
-                "hidden_test.py harus meng-import modul `solution` "
-                "(kode user disimpan sebagai solution.py saat grading)"
+                f"ekstensi berkas {self.file_ext!r} belum didukung kontrak R4 "
+                f"(terdaftar: {sorted(_TEST_RULES)})"
             )
-        if "def test_" not in v:
-            raise ValueError("hidden_test.py tak punya satu pun fungsi `test_*`")
-        return v
+        imports_re, test_re, expectation = rule
+        if not imports_re.search(self.hidden_test) or not test_re.search(self.hidden_test):
+            raise ValueError(f"hidden_test{self.file_ext} harus {expectation}")
+        return self
 
     @model_validator(mode="after")
     def _probe_belongs_to_node(self):
@@ -180,6 +217,23 @@ def _read(path: Path, *, required: bool = True) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _find(directory: Path, stem: str) -> Path:
+    """Berkas `<stem>.<ekstensi apa pun>` — mencerminkan `node_loader.find_instance_file`."""
+    matches = sorted(p for p in directory.glob(f"{stem}.*") if p.is_file())
+    if not matches:
+        raise ArtifactError(f"file wajib tidak ada: {stem}.* di {directory.name}/")
+    return matches[0]
+
+
+def _read_found(directory: Path, stem: str, *, required: bool = True) -> str:
+    try:
+        return _read(_find(directory, stem))
+    except ArtifactError:
+        if required:
+            raise
+        return ""
+
+
 def _wrap(fn, what: str):
     try:
         return fn()
@@ -205,19 +259,29 @@ def load_explanation(job_dir: Path, node_id: str) -> ExplanationArtifact:
 
 
 def load_challenge(job_dir: Path, node_id: str) -> ChallengeArtifact:
+    """Baca artifact R4 dari direktori job.
+
+    Berkas instance ditemukan dari NAMA DASAR (`reference_solution.*`), bukan dari
+    ekstensi yang diasumsikan `.py` — kalau tidak, seluruh domain non-Python ditolak
+    di sini sebelum gate eksekusi sempat berjalan (kebocoran yang M6 tutup di
+    `node_loader` tapi terlewat di sini).
+    """
     variant_dir = job_dir / "variant"
 
     def build() -> ChallengeArtifact:
         meta = json.loads(_read(job_dir / "meta.json"))
         probe_raw = yaml.safe_load(_read(job_dir / "probe.yaml"))
+        hidden = _find(variant_dir, "hidden_test")
         return ChallengeArtifact(
             node_id=node_id,
             variant_label=meta.get("variant_label", ""),
             prompt_md=_read(variant_dir / "prompt.md"),
-            starter_code=_read(variant_dir / "starter_code.py"),
-            reference_solution=_read(variant_dir / "reference_solution.py"),
-            hidden_test=_read(variant_dir / "hidden_test.py"),
+            starter_code=_read_found(variant_dir, "starter_code"),
+            reference_solution=_read_found(variant_dir, "reference_solution"),
+            hidden_test=_read(hidden),
             probe=probe_raw,
+            file_ext=hidden.suffix,
+            expected_json=_read_found(variant_dir, "expected", required=False),
         )
 
     return _wrap(build, "artifact R4 tak valid")

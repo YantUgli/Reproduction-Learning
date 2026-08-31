@@ -57,7 +57,11 @@ class EdgeYaml(BaseModel):
 
 class ProbeYaml(BaseModel):
     """Comprehension probe deterministik (PRD §9). `correct_answer` WAJIB salah satu
-    dari `options` — kalau tidak, probe tak punya jawaban benar pasti."""
+    dari `options` — kalau tidak, probe tak punya jawaban benar pasti.
+
+    Skema hanya bisa membuktikan jawabannya BISA DIPILIH. Bahwa jawabannya BENAR
+    dibuktikan dengan menjalankan `snippet` (M7) — sama seperti mastery: yang
+    memutuskan adalah eksekusi kode, bukan pembacaan."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -67,6 +71,23 @@ class ProbeYaml(BaseModel):
     question: str
     options: list[str]
     correct_answer: str
+    #: Kode yang MENGHASILKAN jawabannya, dan ekspresi yang dibaca sebagai jawaban.
+    #: Dengan keduanya, `correct_answer` bisa dibuktikan lewat EKSEKUSI, bukan cuma
+    #: dicek "ada di options" (lihat `services/probe_verifier.py`). Masih opsional
+    #: selama migrasi kurikulum lama (M7 langkah 6); begitu semua node termigrasi,
+    #: keduanya dinaikkan jadi wajib.
+    snippet: str = ""
+    expression: str = ""
+    #: Nilai yang WAJIB dihasilkan `expression`. Kosong = sama dengan `correct_answer`
+    #: (bentuk terkuat: kunci jawabannya sendiri yang dieksekusi).
+    #:
+    #: Diisi HANYA bila opsi probe berupa prosa, bukan nilai — mis. jawaban "body
+    #: kosong (0 byte)" yang klaim terukurnya `"0"`. Dalam bentuk itu mesin
+    #: membuktikan KLAIM DI BALIK opsi, dan jembatan prosa->nilai tetap tanggung
+    #: jawab penulisnya. Karena jembatan itu tak terperiksa mesin, probe buatan AI
+    #: TIDAK BOLEH memakainya (lihat gate R4 di `claude/jobs.py`) — di sana tak ada
+    #: manusia yang menulis jembatannya.
+    expected_value: str = ""
 
     @field_validator("options")
     @classmethod
@@ -75,11 +96,37 @@ class ProbeYaml(BaseModel):
             raise ValueError("probe harus punya >= 2 options")
         return v
 
+    @field_validator("options")
+    @classmethod
+    def _options_unique(cls, v: list[str]) -> list[str]:
+        """Opsi kembar = dua pilihan yang sama-sama benar (atau sama-sama salah).
+
+        Kalau yang kembar itu jawaban benarnya, Bryant bisa memilih yang benar dan
+        tetap ter-grade salah — kegagalan yang tak akan pernah terlihat dari membaca
+        YAML-nya, tapi gratis ditangkap di sini.
+        """
+        duplikat = sorted({o for o in v if v.count(o) > 1})
+        if duplikat:
+            raise ValueError(f"options punya isi kembar: {duplikat}")
+        return v
+
     @model_validator(mode="after")
     def _answer_in_options(self):
         if self.correct_answer not in self.options:
             raise ValueError(
                 f"correct_answer {self.correct_answer!r} tidak ada di options {self.options!r}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _snippet_and_expression_together(self):
+        """Satu tanpa yang lain tak bisa dijalankan — dan probe yang setengah
+        termigrasi diam-diam lolos sebagai "belum termigrasi", padahal penulisnya
+        mengira sudah terverifikasi."""
+        if bool(self.snippet.strip()) != bool(self.expression.strip()):
+            raise ValueError(
+                "probe harus punya `snippet` DAN `expression` sekaligus, atau tak "
+                "punya keduanya (probe setengah termigrasi tak pernah diverifikasi)"
             )
         return self
 

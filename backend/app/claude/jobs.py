@@ -1,16 +1,27 @@
-"""Orkestrasi job Claude Code: trigger → jalankan → validasi → gate (M5 langkah 2 & 5).
+"""Orkestrasi job Claude Code: trigger → jalankan → validasi → GERBANG MESIN → promosi.
 
 Alur satu job (semuanya di latar, TAK PERNAH memblokir request UI):
 
     pending  --execute_job()-->  running  --runner-->  artifact di direktori job
                                               |
                        contracts.py (skema) --+--> tak lolos --> failed
+                       grounding kutipan R3 --+--> tak lolos --> failed
                                               |
-                       gate otomatis R4 (test hijau di solusi referensi)
+                       gerbang R4: TRIAD eksekusi + probe dijalankan
                                               |
-                                     merah --+--> rejected (tak pernah sampai ke Isyah)
+                                     merah --+--> rejected (tak pernah masuk sistem)
                                               |
-                                            ready  --> ANTREAN REVIEW ISYAH
+                                            ready --> PROMOSI OTOMATIS ke data/ + DB
+
+Sampai M6 alurnya berhenti di `ready` dan menunggu klik Isyah. Sejak §7 2026-08-31
+approve manusia bukan lagi gerbang blokir: artifact yang lolos SELURUH gerbang mesin
+langsung masuk sistem, dan peninjauan manusia pindah ke belakang (meja audit +
+tombol pensiun di `/authoring`). Alasan lengkap + batasnya ada di entri log itu;
+ringkasnya: peran manusia di sini tak pernah gerbang *mastery* — verdict selalu
+eksekusi kode (§1.2) — melainkan gerbang kualitas konten, dan node buruk memakan
+waktu Bryant sedangkan verdict buruk menanam keyakinan palsu.
+
+Matikan lewat `CLAUDE_AUTO_PROMOTE=0` → alurnya kembali berhenti di `ready`.
 
 Beda `failed` vs `rejected` disengaja: `failed` = tak berhasil memproduksi artifact
 (CLI mati, timeout, format salah); `rejected` = artifact ada tapi tak lolos mutu.
@@ -29,18 +40,20 @@ from app.claude.artifacts import Job, JobStatus, Role, new_job, read_job, save_j
 from app.claude.prompts import render
 from app.claude.runner import ClaudeRunner, CliClaudeRunner
 from app.config import (
+    CLAUDE_AUTO_PROMOTE,
     CLAUDE_MAX_RETRIES,
     CLAUDE_TIMEOUT_SECONDS,
     DATA_DIR,
     EXPLANATION_MAX_CHARS,
     REPO_ROOT,
 )
-from app.executor import Executor, SubprocessExecutor
+from app.graders import get_grader
+from app.graders.files import repo_pointer
 from app.models import Attempt, ChallengeInstance, Node
-from app.services.node_loader import load_sources
-
-#: Timeout gate R4 — ini eksekusi pytest node, bukan panggilan agent.
-_GATE_TIMEOUT_SECONDS = 30
+from app.services import grounding, quality_gate
+from app.services.node_loader import find_instance_file, load_sources
+from app.services.probe_verifier import verify_probe
+from app.services.quality_gate import run_triad
 
 
 class JobError(ValueError):
@@ -155,7 +168,6 @@ def execute_job(
     session: Session,
     *,
     runner: ClaudeRunner | None = None,
-    executor: Executor | None = None,
 ) -> Job:
     job = read_job(job_id)
     if job.status not in (JobStatus.pending.value, JobStatus.failed.value):
@@ -185,7 +197,7 @@ def execute_job(
             continue
 
         if job.role == Role.r4_challenge.value:
-            gate = _gate_r4(job, executor=executor)
+            gate = _gate_r4(job, session)
             job.gate = gate
             if not gate["passed"]:
                 last_error = gate["reason"]
@@ -195,7 +207,41 @@ def execute_job(
 
         job.summary = summary
         job.error = ""
-        return set_status(job, JobStatus.ready)
+        ready = set_status(job, JobStatus.ready)
+
+        # PROMOSI OTOMATIS (M7 langkah 9). Sampai M6 alurnya berhenti di sini dan
+        # menunggu klik Isyah; sejak §7 2026-08-31 artifact yang lolos SELURUH gerbang
+        # mesin langsung masuk sistem, dan peninjauan manusia pindah ke belakang
+        # (meja audit + tombol pensiun di `/authoring`).
+        #
+        # Diimpor di dalam fungsi: `review_queue` mengimpor `contracts` & `node_loader`
+        # seperti modul ini, dan impor tingkat-modul membuat keduanya saling menunggu.
+        # Materi yang groundingnya belum bisa diperiksa DITAHAN di `ready`: ia boleh
+        # ada, tapi tak boleh sampai ke Bryant tanpa ada yang memeriksanya — entah
+        # mesin (snapshot sumbernya dibuat) atau manusia (approve manual).
+        if summary.get("grounding_unverified"):
+            job.error = (
+                "ditahan: grounding belum bisa diperiksa — " + summary["grounding_unverified"]
+            )
+            save_job(job)
+            return read_job(job.id)
+
+        if CLAUDE_AUTO_PROMOTE:
+            from app.claude import review_queue
+
+            try:
+                promotion = review_queue.promote(session, job.id)
+                job = read_job(job.id)
+                job.summary = {**job.summary, "auto_promoted": promotion.written_paths}
+                save_job(job)
+            except review_queue.PromotionError as e:
+                # Gerbang lolos tapi promosi tetap gagal (mis. label varian bentrok).
+                # Artifact tetap `ready` — bisa dipromosikan manual setelah dibereskan.
+                job = read_job(job.id)
+                job.error = f"lolos gerbang tapi promosi otomatis gagal: {e}"
+                save_job(job)
+            return read_job(job.id)
+        return ready
 
     # Semua percobaan habis.
     gate_failed = job.gate is not None and not job.gate.get("passed", False)
@@ -214,10 +260,21 @@ def _validate(job: Job, session: Session) -> dict:
         artifact = contracts.load_explanation(job.dir, node_id)
         known = {s.id for s in load_sources(DATA_DIR / "sources.yaml")}
         contracts.check_citations_known(artifact, known)
+        # Sitasi menunjuk sumber yang ADA belum berarti klaimnya ditopang sumber itu.
+        # Tanpa manusia di jalur (M7), kutipannya harus benar-benar dicocokkan.
+        problems = grounding.check_quotes(artifact.citations)
+        pesan = "; ".join(str(p) for p in problems)
+        if problems and not grounding.only_missing_snapshots(problems):
+            raise contracts.ArtifactError("sitasi tak lolos grounding verbatim: " + pesan)
         return {
             "explanation_chars": len(artifact.explanation_md),
             "citations": len(artifact.citations),
             "has_worked_example": bool(artifact.worked_example.strip()),
+            # "Belum bisa diverifikasi" bukan "terverifikasi salah". Sumber yang belum
+            # di-snapshot menahan PROMOSI (materi tak sampai ke Bryant sendirinya),
+            # tapi tak menghukum artifact-nya sebagai cacat — kekurangannya di pihak
+            # kita, dan menolaknya cuma menyuruh model mengulang kerja yang sudah benar.
+            "grounding_unverified": pesan if problems else "",
         }
 
     if job.role == Role.r4_challenge.value:
@@ -245,56 +302,103 @@ def _validate(job: Job, session: Session) -> dict:
     }
 
 
-def _gate_r4(job: Job, *, executor: Executor | None = None) -> dict:
-    """GATE OTOMATIS (M5 langkah 5): soal buatan AI diuji SEBELUM manusia melihatnya.
+def _gate_r4(job: Job, session: Session) -> dict:
+    """GATE OTOMATIS (M5 langkah 5, dinaikkan jadi TRIAD di M7 langkah 1).
 
-    Dua pemeriksaan, keduanya eksekusi kode:
-      1. hidden test WAJIB hijau di reference_solution (aturan §10 R4 — sama persis
-         dengan gerbang authoring manusia di `scripts/verify_nodes.py`).
-      2. hidden test WAJIB merah di starter_code — kalau kerangka sudah lolos,
-         tantangannya kosong dan lolosnya tak membuktikan apa pun.
+    Soal buatan AI diuji SEBELUM manusia melihatnya, dengan aturan yang sama persis
+    dengan gerbang authoring tulisan tangan (`scripts/verify_nodes.py`) — keduanya
+    memanggil `services/quality_gate.run_triad`. Aturan yang hidup di dua salinan
+    cepat atau lambat akan berbeda, dan yang lebih longgar yang akan dipakai.
+
+    Dinilai lewat grader NODE-nya (`get_grader(node.grader_type)`), bukan lewat
+    `SubprocessExecutor` langsung. Versi M5 memanggil executor Python apa adanya dan
+    membaca `reference_solution.py` secara literal — artinya gate ini diam-diam hanya
+    bekerja untuk domain Python, dan node React/ML lolos tanpa pernah benar-benar
+    tergerbang. Timeout pun sekarang milik grader (React butuh 120 detik, bukan 30).
     """
-    executor = executor or SubprocessExecutor()
+    node = _node(session, job.request.get("node_id", ""))
+    grader = get_grader(node.grader_type)
+
     variant = job.dir / "variant"
-    hidden_test = (variant / "hidden_test.py").read_text(encoding="utf-8")
-    reference = (variant / "reference_solution.py").read_text(encoding="utf-8")
-    starter = (variant / "starter_code.py").read_text(encoding="utf-8")
+    hidden = _find_variant_file(variant, "hidden_test")
+    reference = _find_variant_file(variant, "reference_solution").read_text(encoding="utf-8")
+    starter_file = find_instance_file(variant, "starter_code")
 
-    ref_run = executor.run(
-        files={"solution.py": reference, "test_solution.py": hidden_test},
-        test_entry="test_solution.py",
-        timeout_seconds=_GATE_TIMEOUT_SECONDS,
+    instance = ChallengeInstance(
+        id=f"{node.id}__gate_{job.id}",
+        node_id=node.id,
+        variant_label=job.request.get("variant_label", "gate"),
+        prompt="",
+        starter_code="",
+        signature_contract="",
+        hidden_test_path=repo_pointer(hidden),
+        scaffold_level="L2",
     )
-    if not ref_run.passed:
-        return {
-            "passed": False,
-            "reason": "hidden test MERAH di reference_solution — ditolak otomatis (§10 R4)",
-            "reference_passed": False,
-            "starter_passed": None,
-            "output": _tail(ref_run.stdout + ref_run.stderr),
-        }
 
-    starter_run = executor.run(
-        files={"solution.py": starter, "test_solution.py": hidden_test},
-        test_entry="test_solution.py",
-        timeout_seconds=_GATE_TIMEOUT_SECONDS,
+    triad = run_triad(
+        grader,
+        instance,
+        reference=reference,
+        starter=starter_file.read_text(encoding="utf-8") if starter_file else None,
     )
-    if starter_run.passed:
-        return {
-            "passed": False,
-            "reason": "starter_code sudah LOLOS hidden test — tantangannya kosong",
-            "reference_passed": True,
-            "starter_passed": True,
-            "output": _tail(starter_run.stdout),
-        }
 
-    return {
-        "passed": True,
-        "reason": "hidden test hijau di reference_solution & merah di starter_code",
-        "reference_passed": True,
-        "starter_passed": False,
-        "output": _tail(ref_run.stdout),
+    def _passed(name: str) -> bool | None:
+        check = triad.check(name)
+        return None if check is None or check.skipped else check.test_passed
+
+    failing = triad.failing
+    gate = {
+        "passed": triad.ok,
+        "reason": triad.reason,
+        "reference_passed": _passed(quality_gate.REFERENCE),
+        "empty_passed": _passed(quality_gate.EMPTY),
+        "starter_passed": _passed(quality_gate.STARTER),
+        "output": failing.output if failing else (triad.check(quality_gate.REFERENCE).output),
     }
+    if not triad.ok:
+        return gate
+
+    # Probe buatan AI: kunci jawabannya DIJALANKAN, tak cukup "ada di options".
+    # Sejak M7 tak ada manusia yang wajib membacanya, jadi satu-satunya yang berdiri
+    # antara probe berkunci salah dan Bryant adalah pemeriksaan ini.
+    artifact = contracts.load_challenge(job.dir, node.id)
+    probe = artifact.probe
+
+    # Di sini gate MESIN sengaja lebih ketat daripada gerbang authoring manusia.
+    # Probe tulisan tangan boleh berupa prosa dengan `expected_value` sebagai klaim
+    # terukurnya — jembatan prosa->nilai ditulis manusia dan bisa dibaca ulang.
+    # Probe buatan AI tak punya penulis yang bisa ditanya, jadi jawabannya WAJIB
+    # berupa nilai yang persis keluar dari eksekusi: tak ada jembatan, tak ada celah.
+    if not probe.snippet.strip():
+        gate["passed"] = False
+        gate["reason"] = (
+            "probe tanpa `snippet`/`expression` — kunci jawabannya tak bisa dibuktikan "
+            "mesin, dan tak ada manusia di jalur ini (§7 2026-08-31)"
+        )
+        return gate
+    if probe.expected_value.strip():
+        gate["passed"] = False
+        gate["reason"] = (
+            "probe buatan AI memakai `expected_value` (jawaban berupa prosa) — "
+            "jawabannya harus berupa nilai yang persis dihasilkan eksekusi"
+        )
+        return gate
+
+    verdict = verify_probe(probe, file_ext=artifact.file_ext)
+    gate["probe_verified"] = verdict.ok and not verdict.skipped
+    if not verdict.ok:
+        gate["passed"] = False
+        gate["reason"] = f"probe ditolak: {verdict.reason}"
+        gate["output"] = verdict.output
+    return gate
+
+
+def _find_variant_file(variant_dir: Path, stem: str) -> Path:
+    """Berkas instance dari NAMA DASAR — `.py` (FastAPI/ML) maupun `.jsx` (React)."""
+    found = find_instance_file(variant_dir, stem)
+    if found is None:
+        raise JobError(f"artifact tak punya {stem}.* di variant/ (job {variant_dir.parent.name})")
+    return found
 
 
 # --------------------------------------------------------------------------- #
@@ -312,9 +416,7 @@ def _node(session: Session, node_id: str) -> Node:
 
 
 def _instances(session: Session, node_id: str) -> list[ChallengeInstance]:
-    rows = session.exec(
-        select(ChallengeInstance).where(ChallengeInstance.node_id == node_id)
-    ).all()
+    rows = session.exec(select(ChallengeInstance).where(ChallengeInstance.node_id == node_id)).all()
     return sorted(rows, key=lambda i: i.variant_label)
 
 
@@ -359,9 +461,7 @@ def _next_probe_id(session: Session, node_id: str) -> str:
     from app.models import ComprehensionProbe
 
     count = len(
-        session.exec(
-            select(ComprehensionProbe).where(ComprehensionProbe.node_id == node_id)
-        ).all()
+        session.exec(select(ComprehensionProbe).where(ComprehensionProbe.node_id == node_id)).all()
     )
     match = re.match(r"^(n\d+)", node_id)
     prefix = match.group(1) if match else node_id

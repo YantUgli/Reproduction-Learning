@@ -10,16 +10,18 @@ Dua sifat yang menentukan bentuk router ini:
    di-approve (artifact lama tak jadi sandera kill switch).
 """
 
+import yaml
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.claude import jobs, review_queue
 from app.claude.artifacts import Job, JobStatus, list_jobs, read_job
 from app.claude.runner import cli_available
-from app.config import CLAUDE_INTEGRATION_ENABLED
+from app.config import CLAUDE_INTEGRATION_ENABLED, DATA_DIR
 from app.db import engine, get_session
-from app.models import HypothesisStatus
+from app.models import Domain, HypothesisStatus
+from app.services import edge_evidence, telemetry
 from app.services.hypotheses import list_hypotheses
 
 router = APIRouter(prefix="/authoring", tags=["authoring"])
@@ -248,9 +250,7 @@ def _existing_targets(session: Session, job: Job) -> dict[str, str]:
     if not node_id:
         if job.role == "r2":
             unverified = [
-                h
-                for h in list_hypotheses(session)
-                if h.status == HypothesisStatus.unverified.value
+                h for h in list_hypotheses(session) if h.status == HypothesisStatus.unverified.value
             ]
             return {"(hipotesis unverified saat ini)": str(len(unverified))}
         return {}
@@ -272,3 +272,82 @@ def _existing_targets(session: Session, job: Job) -> dict[str, str]:
                 if f.is_file():
                     out[f"instances/{label}/{f.name}"] = f.read_text(encoding="utf-8")
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Meja AUDIT (M7 langkah 8)
+#
+# Sampai M6 halaman `/authoring` adalah antrean BLOKIR: tak ada artifact yang masuk
+# sistem sebelum Isyah menekan approve. Sejak §7 2026-08-31 gerbang mesin yang
+# memutuskan, dan peran manusia pindah ke belakang: melihat node yang sudah dipakai
+# Bryant dan menandai mana yang ternyata tak layak.
+#
+# Yang ditampilkan di sini sengaja BUKAN dashboard atau graf (§8 menolak DAG
+# explorer): ia daftar bertanda, dengan alasan dan angkanya, supaya keputusan
+# pensiun bisa diambil dalam hitungan detik.
+# --------------------------------------------------------------------------- #
+class AuditSignal(BaseModel):
+    node_id: str
+    kind: str
+    detail: str
+    samples: int
+
+
+class AuditEdge(BaseModel):
+    from_node_id: str
+    to_node_id: str
+    kind: str
+    reason: str
+
+
+class AuditOut(BaseModel):
+    # Seberapa banyak kurikulum yang PUNYA data untuk dinilai. Tanpa angka ini,
+    # "tak ada temuan" mudah dibaca sebagai "semuanya sehat", padahal dengan satu
+    # pelajar ia hampir selalu berarti "belum ada datanya".
+    coverage: dict
+    node_signals: list[AuditSignal]
+    edge_findings: list[AuditEdge]
+    # Satu-satunya hal di M7 yang memang menunggu manusia: arah kurikulum per domain.
+    # Tak ada oracle untuk "apakah ini kurikulum yang benar" — di sistem mana pun.
+    domains_without_destination: list[str]
+
+
+@router.get("/audit", response_model=AuditOut)
+def audit(session: Session = Depends(get_session)) -> AuditOut:
+    edges = edge_evidence.corroboration(session) + edge_evidence.predictive_evidence(session)
+    return AuditOut(
+        coverage=telemetry.coverage(session),
+        node_signals=[
+            AuditSignal(node_id=s.node_id, kind=s.kind, detail=s.detail, samples=s.samples)
+            for s in telemetry.signals(session)
+        ],
+        edge_findings=[
+            AuditEdge(
+                from_node_id=f.from_node_id,
+                to_node_id=f.to_node_id,
+                kind=f.kind,
+                reason=f.reason,
+            )
+            for f in edges
+            if f.kind != "corroborated"
+        ],
+        domains_without_destination=_domains_without_destination(session),
+    )
+
+
+def _domains_without_destination(session: Session) -> list[str]:
+    """Domain yang belum punya `destination` di `domain.yaml`.
+
+    `destination` sengaja TIDAK diisi otomatis: ia adalah keputusan "mau jadi apa",
+    dan itu justru satu-satunya bagian yang tak bisa diserahkan ke mesin (§7
+    2026-08-31). Ditetapkan sekali per domain, bukan per node.
+    """
+    out = []
+    for domain in session.exec(select(Domain)).all():
+        meta_path = DATA_DIR / "domains" / domain.id / "domain.yaml"
+        if not meta_path.exists():
+            continue
+        meta = yaml.safe_load(meta_path.read_text(encoding="utf-8")) or {}
+        if not str(meta.get("destination", "")).strip():
+            out.append(domain.id)
+    return sorted(out)
