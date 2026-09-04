@@ -30,6 +30,42 @@ if (typeof window !== "undefined") {
     },
   };
   loader.config({ monaco });
+
+  // Matikan layanan bahasa JS/TS SUNGGUHAN, bukan cuma di UI. Untuk node React (`.jsx`
+  // → mode `javascript`) Monaco menyalakan layanan bahasa TypeScript-nya yang berjalan
+  // di WORKER TERPISAH (`ts.worker`) — bukan `editor.worker` yang kita sediakan. Efeknya
+  // dua-duanya buruk: (1) melanggar §2 karena menghidupkan validasi/saran cerdas untuk JS,
+  // dan (2) memanggil `ts.worker` yang tak pernah kita bundel → "Missing requestHandler or
+  // method: getSyntacticDiagnostics". Python tak punya layanan seperti ini (highlight-nya
+  // Monarch di main-thread), makanya bug ini baru muncul begitu node React masuk kurikulum.
+  // Mematikan diagnostics + seluruh fitur mode membuat JS/TS berperilaku seperti Python:
+  // highlight sintaks tetap (tokenizer main-thread), tapi tak ada worker bahasa yang
+  // dipanggil. §2 aman, error hilang.
+  for (const d of [
+    monaco.languages.typescript.javascriptDefaults,
+    monaco.languages.typescript.typescriptDefaults,
+  ]) {
+    d.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntacticValidation: true,
+      noSuggestionDiagnostics: true,
+    });
+    d.setModeConfiguration({
+      completionItems: false,
+      hovers: false,
+      documentSymbols: false,
+      definitions: false,
+      references: false,
+      documentHighlights: false,
+      rename: false,
+      diagnostics: false,
+      documentRangeFormattingEdits: false,
+      signatureHelp: false,
+      onTypeFormattingEdits: false,
+      codeActions: false,
+      inlayHints: false,
+    });
+  }
 }
 
 export default function SandboxEditor({

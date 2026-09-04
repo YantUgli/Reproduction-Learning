@@ -1,0 +1,7 @@
+{
+  "rtol": 1e-09,
+  "atol": 0.0,
+  "expected": {
+    "sigmoid_extremes": [0.0, 1.0]
+  }
+}

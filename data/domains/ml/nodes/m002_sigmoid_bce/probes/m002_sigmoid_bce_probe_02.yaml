@@ -1,0 +1,14 @@
+id: m002_sigmoid_bce_probe_02
+node_id: m002_sigmoid_bce
+type: predict_output
+question: BCE ini meng-clip prediksi ke [eps, 1-eps] dengan eps=1e-12. Untuk y_true=[1.0] dan y_pred=[0.0] (prediksi sepenuhnya salah), berapa `round(binary_cross_entropy(...), 2)`?
+options:
+  - inf
+  - '27.63'
+  - '0.0'
+  - nan
+correct_answer: '27.63'
+snippet: "import numpy as np\n\n\ndef binary_cross_entropy(y_true, y_pred, eps=1e-12):\n    y_true = np.asarray(y_true, dtype=float)\n    y_pred = np.clip(np.asarray(y_pred, dtype=float), eps, 1.0 - eps)\n\
+  \    return float(-np.mean(y_true * np.log(y_pred) + (1 - y_true) * np.log(1 - y_pred)))\n"
+expression: round(binary_cross_entropy(np.array([1.0]), np.array([0.0])), 2)
+expected_value: ''
