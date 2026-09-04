@@ -572,3 +572,64 @@ alasan · alternatif yang ditolak.
   `verify_nodes.py` MATI dengan `UnicodeEncodeError` saat mencetak output vitest (U+276F
   di konsol cp1252) — persis ketika sedang melaporkan kegagalan, jadi pesan yang paling
   dibutuhkan justru yang hilang.
+
+- **2026-09-04 · L0 · Lajur Library dibuka kembali dari §8 — TAPI sebagai peta +
+  catatan bersitasi, BUKAN bab materi. Batas keras: prosa penjelasan sintesis AI tak
+  pernah mendarat di `library/`.** §8 menolak "content library/bab materi panjang"; L0
+  membuka lajur `library/` tanpa menghidupkan yang ditolak itu, dengan menetapkan apa
+  yang boleh & tak boleh mendarat di sana. Roadmap lengkap:
+  [`docs/roadmap-library-lane.md`](docs/roadmap-library-lane.md); arah:
+  [`docs/brainstorm-knowledge-management-lane.md`](docs/brainstorm-knowledge-management-lane.md).
+
+  **Boleh di `library/`:** catatan & transkripsi tulisan Bryant sendiri, kerangka/indeks
+  course, roadmap belajar, sitasi terkurasi ke sumber otoritatif (`id` di `data/sources.yaml`),
+  dan `node_ids` (link ke node Forge). **TIDAK boleh:** prosa penjelasan yang disintesis
+  AI — itu tetap hidup di `artifacts/` dan sampai ke Bryant **hanya lewat gerbang 403**
+  (materi muncul sesudah attempt gagal). Ini menegakkan, bukan melonggarkan, konsekuensi
+  entri 2026-08-31: tanpa manusia yang membaca materi generate sebelum sampai ke Bryant,
+  403 adalah **satu-satunya** penjaga tersisa terhadap content library, jadi ia tak boleh
+  di-bypass lewat pintu `library/`.
+
+  **Dua penjaga yang menyertai pembukaan ini:** (1) **grounding** — apa pun yang generate
+  di `library/` cuma peta + sitasi ke sumber otoritatif, bukan sintesis; "baca senyaman
+  Dicoding" diarahkan ke sumber ASLI yang ditunjuk peta + catatan milik Bryant, bukan
+  parafrase LLM. (2) **"% direproduksi, bukan % dibaca"** — status reproduksi TIDAK
+  disimpan di frontmatter materi; ia dihitung dashboard (L5) dengan join `node_ids` → DB
+  Forge. Menyimpannya di dua tempat = dua sumber kebenaran (pola yang sudah ditolak: job
+  state di file, toleransi ML di `data/`).
+
+  **Format beku (lihat `library/README.md`):** `library/` **di-commit ke git** (kebalikan
+  `artifacts/` yang git-ignored) dan di-diff seperti `data/`; dibuka di Obsidian untuk
+  graf. Bentuk: `library/<course>/<NN-modul>/<materi>.md` + `_index.md` per level.
+  Frontmatter: `title, course, module, type (note|transcription|outline|roadmap),
+  source_refs, node_ids, status (outline|captured), created`. `status` = status CATATAN
+  (kerangka kosong vs sudah berisi), **bukan** status reproduksi.
+
+  **Konsekuensi untuk roadmap:** L3 (`learn-intake`) di-reframe dari "generate bab materi
+  → Library" menjadi "generate roadmap + sitasi + usul node → Library; sintesis penjelasan
+  → artifacts/403". Roadmap docs diperbarui seiring entri ini.
+
+  *Ditolak:* (i) materi generate sebagai bab yang dibaca di `library/` sebelum mencoba
+  (membalik 2026-08-31; 403 tak lagi jadi penjaga tunggal, membuka §8 lewat pintu
+  belakang); (ii) hybrid — simpan bab generate tapi kunci per-file gaya 403 (biaya build
+  besar untuk kenyamanan yang justru sudah dijaga 403 di `artifacts/`, dan menduplikasi
+  mekanisme gerbang); (iii) `status: forged` di frontmatter (dua sumber kebenaran dengan
+  DB — status reproduksi hanya boleh datang dari eksekusi kode, §1.2).
+
+- **2026-09-04 · L2 · `note-refine`: overwrite menggantikan create-only; guard lunak =
+  disiplin skill + Bryant baca diff.** L1 aman *by construction* (scaffolder deterministik,
+  nol prosa AI). L2 memang harus menulis ke stub yang sudah ada, jadi create-only pecah di
+  sini — diganti dengan: `library/` di-commit ke git (beda `artifacts/` yang git-ignored),
+  jadi git = undo kapan saja. Dua bagian mekanis tetap keluar dari tangan AI: (a) **flip
+  `status`** hanya lewat `scripts/verify_library.py --capture` yang mengecek body berisi
+  dulu (body masih stub → tolak), dan (b) **validasi refs ⊆ registry** (`source_refs` ⊆
+  `data/sources.yaml`, `node_ids` ⊆ node `data/domains/`). AI berperan sebagai **editor**
+  (perbaiki bahasa/struktur/format teks Bryant), bukan penulis: celah ditandai
+  `> TODO: …`, tak pernah ditambal prosa. Format L0 beku dijaga: himpunan 8 field wajib
+  persis, `type`/`status` hanya nilai sah; field asing atau hilang ditolak validator.
+  **Batas yang diterima sadar:** L2 menaruh teks sentuhan-AI ke `library/`, tapi (a)
+  input milik Bryant, (b) penjaga metrik bikin catatan rapi tak pernah menggerakkan mastery
+  %, (c) Bryant reviewer atas tulisannya sendiri, (d) gerbang 403 tetap satu-satunya jalan
+  prosa generate — dan L2 dilarang mensintesis. *Ditolak:* citation-teeth gaya R3
+  (melebur L2→L3, terlalu berat), raw-preserved verbatim (dobel konten), refuse-on-dirty-tree
+  (friksi commit tiap sesi), formatter nol-AI (turun jadi linter, tak merestruktur dikte).
