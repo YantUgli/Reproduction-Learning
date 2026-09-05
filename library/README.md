@@ -90,6 +90,36 @@ created: 2026-09-04
 
 ---
 
+## Aturan tambahan untuk `type: roadmap` (L3 · ditegakkan mesin)
+
+File `roadmap` adalah satu-satunya tempat teks hasil riset AI mendarat di `library/`,
+jadi ia dijaga `scripts/verify_library.py` dengan aturan yang **tidak** berlaku untuk
+file `note`/`transcription`/`outline`:
+
+| Aturan | Kenapa |
+|---|---|
+| **Dilarang blok kode** (code fence) | fence di peta adalah sinyal paling jujur bahwa ia berubah jadi materi (§8) |
+| `source_refs` **wajib non-kosong** | peta tanpa sitasi = peta tanpa gigi |
+| tiap `source_ref` wajib punya `data/sources/<id>.md` | tanpa snapshot, kutipan tak bisa dicocokkan dengan apa pun |
+| tiap kutipan `> "…"` wajib **verbatim ada** di snapshot | inti gerbang L3 — mesin yang sama dengan gate R3 (`app/services/grounding.py`) |
+| kutipan ≥ 25 karakter (`MIN_QUOTE_CHARS`) | potongan sependek itu cocok secara kebetulan |
+| prosa non-kutipan ≤ 3000 karakter | peta, bukan bab (preseden `EXPLANATION_MAX_CHARS`) |
+
+**Bentuk baris kutipan `> "…"` itu KONTRAK, bukan gaya** — validator mengenali kutipan
+justru dari bentuk ini. Menulisnya dengan bentuk lain membuatnya lolos **tanpa**
+diperiksa: persis kebalikan dari yang kita mau.
+
+**Kutipan hanya hidup di file `roadmap`.** Sitasi di file `note` TIDAK diverifikasi
+(itu tulisan Bryant, bukan klaim generate) — jadi jangan pernah menaruh sitasi generate
+di stub materi.
+
+**Snapshot tak pernah diketik tangan.** `data/sources/<id>.md` hanya lahir dari
+`python scripts/fetch_source.py --id <id>` (unduhan, `provenance: fetch`) atau berkas
+yang Bryant sediakan (`--from-file`, `provenance: manual`). Kalau isinya boleh dikarang,
+pemeriksaan "kutipan ⊆ snapshot" jadi melingkar.
+
+---
+
 ## Template siap-salin
 
 **`_index.md` course:**

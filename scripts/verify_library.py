@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validator + capture lajur Library (L2 · note-refine).
+"""Validator + capture lajur Library (L2 · note-refine; aturan roadmap L3).
 
 Dua mode:
   (default)         validasi SEMUA library/**/*.md → gerbang commit.
@@ -10,18 +10,40 @@ Dua mode:
 Registry (sumber kebenaran untuk ⊆):
   - source ids ← data/sources.yaml  (source_refs ⊆ ini)
   - node ids   ← data/domains/*/nodes/*/node.yaml `id` (node_ids ⊆ ini)
+
+File `type: roadmap` (L3) dapat aturan tambahan — lihat `roadmap_errors()`. Ini
+gerbang BACA; kembarannya gerbang TULIS di `library_scaffold.check_grounding()`.
 """
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
 import yaml
+from _console import force_utf8_stdio
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _LIBRARY_ROOT = _REPO_ROOT / "library"
 _SOURCES_YAML = _REPO_ROOT / "data" / "sources.yaml"
+
+# --- L3: gerbang kutipan DIPINJAM dari backend (satu sumber kebenaran) -----------
+# Aturan kutipan verbatim sudah hidup di `app/services/grounding.py` (gate R3/M7).
+# Dua salinan gerbang = satu gerbang yang menyimpang diam-diam.
+sys.path.insert(0, str(_REPO_ROOT / "backend"))
+from app.services.grounding import MIN_QUOTE_CHARS, normalize  # noqa: E402
+
+_SNAPSHOT_DIR = _REPO_ROOT / "data" / "sources"
+#: Peta = pointer + sitasi, bukan bab. Preseden: EXPLANATION_MAX_CHARS = 2500 di
+#: config.py — guardrail §8 yang bisa DIUJI. Baris kutipan TIDAK ikut dihitung: yang
+#: dibatasi adalah prosa yang ditulis AI, bukan teks sumber yang dikutip.
+MAX_ROADMAP_PROSE_CHARS = 3000
+#: Kutipan = baris blockquote yang SELURUHNYA berada di dalam tanda kutip ganda.
+#: Blockquote lain (catatan, sentinel stub, nav) sengaja tidak dianggap kutipan —
+#: kalau tidak, tiap catatan pinggir jadi kewajiban sitasi palsu.
+_QUOTE_RE = re.compile(r'^>\s*"(.+)"\s*$')
+_FENCE_RE = re.compile(r"^\s*```")
 
 _REQUIRED_FM = {"title", "course", "module", "type", "source_refs",
                 "node_ids", "status", "created"}
@@ -128,6 +150,63 @@ def _field_errors(fm: dict, path: Path, source_ids: set[str],
     return errs
 
 
+def extract_quotes(body: str) -> list[str]:
+    out = []
+    for line in body.splitlines():
+        m = _QUOTE_RE.match(line.strip())
+        if m:
+            out.append(m.group(1).strip())
+    return out
+
+
+def _prose_chars(body: str) -> int:
+    return sum(len(line.strip()) for line in body.splitlines()
+               if not line.lstrip().startswith(">"))
+
+
+def roadmap_errors(fm: dict, body: str, *,
+                   snapshot_dir: Path | None = None) -> list[str]:
+    """Aturan L3 untuk file `type: roadmap`. Kumpulkan SEMUA pelanggaran.
+
+    Gerbang BACA: kembarannya adalah gerbang TULIS di `library_scaffold.check_grounding`.
+    Keduanya memeriksa hal yang sama di dua waktu berbeda — yang ini menangkap suntingan
+    tangan sesudah scaffold, dan snapshot yang berubah karena `--force`.
+    """
+    snap_dir = snapshot_dir or _SNAPSHOT_DIR
+    errs: list[str] = []
+
+    if any(_FENCE_RE.match(line) for line in body.splitlines()):
+        errs.append("peta memuat blok kode — peta menunjuk sumber, tidak mengajarkan")
+
+    refs = fm.get("source_refs")
+    refs = refs if isinstance(refs, list) else []
+    if not refs:
+        errs.append("file roadmap wajib punya minimal satu source_refs")
+
+    haystacks: list[str] = []
+    for sid in refs:
+        path = snap_dir / f"{sid}.md"
+        if path.is_file():
+            haystacks.append(normalize(path.read_text("utf-8")))
+        else:
+            errs.append(f"{sid} belum di-snapshot — jalankan "
+                        f"scripts/fetch_source.py --id {sid}")
+
+    for quote in extract_quotes(body):
+        norm = normalize(quote)
+        if len(norm) < MIN_QUOTE_CHARS:
+            errs.append(f"kutipan terlalu pendek ({len(norm)} < {MIN_QUOTE_CHARS}): "
+                        f"{quote[:40]!r}")
+        elif not any(norm in hay for hay in haystacks):
+            errs.append(f"kutipan TIDAK ada di snapshot sumbernya: {quote[:60]!r}")
+
+    prose = _prose_chars(body)
+    if prose > MAX_ROADMAP_PROSE_CHARS:
+        errs.append(f"prosa peta {prose} karakter > {MAX_ROADMAP_PROSE_CHARS} — "
+                    "ini sudah jadi bab, bukan peta")
+    return errs
+
+
 def validate_file(path: Path, source_ids: set[str],
                   node_ids: set[str]) -> list[str]:
     text = path.read_text("utf-8")
@@ -139,6 +218,8 @@ def validate_file(path: Path, source_ids: set[str],
             and fm.get("type") in {"note", "transcription"}
             and is_stub_body(body)):
         errs.append("status=captured tapi body masih stub (belum ada catatan)")
+    if fm.get("type") == "roadmap":
+        errs += roadmap_errors(fm, body)
     return errs
 
 
@@ -179,6 +260,7 @@ def _iter_library_files() -> list[Path]:
 
 
 def main(argv: list[str]) -> int:
+    force_utf8_stdio()
     ap = argparse.ArgumentParser(description="Validator + capture lajur Library (L2).")
     ap.add_argument("--capture", type=Path, metavar="FILE",
                     help="flip satu file outline→captured bila body berisi")

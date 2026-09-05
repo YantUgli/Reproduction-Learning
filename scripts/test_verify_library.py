@@ -131,3 +131,83 @@ def test_index_captured_is_not_stub(lib):
                _fm(module="", type="outline", status="captured"),
                "\n# FastAPI Dasar\n\n## Modul\n- [[01-routing-dasar/_index|01 · Routing]]\n")
     assert vl.validate_file(p, SRC_IDS, NODE_IDS) == []
+
+
+# ---------- L3: gerbang BACA untuk file `type: roadmap` ----------
+
+SNAPSHOT = ("---\nsource_ref_id: fastapi_docs_first_steps\n---\n\n"
+            "The simplest FastAPI file could look like this, with one decorator.\n")
+QUOTE = "The simplest FastAPI file could look like this"
+
+
+@pytest.fixture
+def snaps(lib, tmp_path, monkeypatch):
+    d = tmp_path / "data" / "sources"
+    d.mkdir(parents=True)
+    (d / "fastapi_docs_first_steps.md").write_text(SNAPSHOT, encoding="utf-8")
+    monkeypatch.setattr(vl, "_SNAPSHOT_DIR", d)
+    return d
+
+
+def _roadmap_fm(**over):
+    base = _fm(type="roadmap", source_refs=["fastapi_docs_first_steps"])
+    base.update(over)
+    return base
+
+
+def _peta_body(quote=QUOTE, extra=""):
+    return (f"\n# Routing dasar\n\n## Peta materi\n\n### [[get|GET route]]\n"
+            f"**Reproduksi:** tulis route GET /.\n"
+            f"**Sumber:** `fastapi_docs_first_steps`\n> \"{quote}\"\n{extra}")
+
+
+def test_roadmap_kutipan_cocok_lolos(lib, snaps):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/_index.md",
+               _roadmap_fm(), _peta_body())
+    assert vl.validate_file(p, SRC_IDS, NODE_IDS) == []
+
+
+def test_roadmap_kutipan_karangan_ditolak(lib, snaps):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/_index.md", _roadmap_fm(),
+               _peta_body(quote="FastAPI otomatis membuat migrasi database untukmu"))
+    assert any("TIDAK ada di snapshot" in e
+               for e in vl.validate_file(p, SRC_IDS, NODE_IDS))
+
+
+def test_roadmap_sumber_belum_di_snapshot_ditolak(lib, snaps):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/_index.md",
+               _roadmap_fm(source_refs=["fastapi_official_docs"]), _peta_body())
+    errs = vl.validate_file(p, SRC_IDS, NODE_IDS)
+    assert any("belum di-snapshot" in e for e in errs)
+
+
+def test_roadmap_blok_kode_ditolak(lib, snaps):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/_index.md", _roadmap_fm(),
+               _peta_body(extra="\n```python\napp = FastAPI()\n```\n"))
+    assert any("blok kode" in e for e in vl.validate_file(p, SRC_IDS, NODE_IDS))
+
+
+def test_roadmap_tanpa_source_refs_ditolak(lib, snaps):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/_index.md",
+               _roadmap_fm(source_refs=[]), "\n# Peta kosong\n\nsatu baris.\n")
+    assert any("minimal satu source_refs" in e
+               for e in vl.validate_file(p, SRC_IDS, NODE_IDS))
+
+
+def test_roadmap_kutipan_terlalu_pendek_ditolak(lib, snaps):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/_index.md", _roadmap_fm(),
+               _peta_body(quote="FastAPI file"))
+    assert any("terlalu pendek" in e for e in vl.validate_file(p, SRC_IDS, NODE_IDS))
+
+
+def test_roadmap_prosa_kepanjangan_ditolak(lib, snaps):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/_index.md", _roadmap_fm(),
+               _peta_body(extra="\n" + ("penjelasan panjang. " * 200)))
+    assert any("sudah jadi bab" in e for e in vl.validate_file(p, SRC_IDS, NODE_IDS))
+
+
+def test_aturan_roadmap_tak_menyentuh_file_note(lib, snaps):
+    """Kutipan di catatan Bryant adalah tulisannya sendiri — bukan klaim generate."""
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/get.md", _fm(),
+               '\n# GET\n\ncatatanku.\n\n> "kutipan bebas yang tak ada di snapshot"\n')
+    assert vl.validate_file(p, SRC_IDS, NODE_IDS) == []

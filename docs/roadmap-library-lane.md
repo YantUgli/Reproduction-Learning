@@ -59,7 +59,7 @@ Diturunkan dari CLAUDE.md §1–§2 + dua penjaga brainstorm:
 | **L0** | Fondasi Library (format + keputusan) | — | — (menulis penjaga) | — |
 | **L1** | `course-intake` | tidak | nol mastery | L0 |
 | **L2** | `note-refine` | tidak (AI = editor) | nol mastery | L1 |
-| **L3** | `learn-intake` + grounding | **ya** | §8 (content library) | L2 |
+| **L3** | `learn-intake` + grounding ✅ | **ya** | §8 (content library) | L2 |
 | **L4** | Jembatan Library→Forge | ya (usul node) | pakai gate M5/M7 | L3 |
 | **L5** | Penjaga metrik (dashboard) | — | **wajib sebelum "selesai"** | L4 |
 
@@ -107,15 +107,32 @@ menambah risiko.
 - **Acceptance:** catatan mentah → markdown rapi tertaut ke modul yang benar; status
   di-flip SCRIPT (bukan AI); validator hijau; nol klaim mastery.
 
-### L3 — `learn-intake` + grounding (fase risiko) — DIREFRAME di L0
+### L3 — `learn-intake` + grounding (fase risiko) — ✅ SELESAI & TERVERIFIKASI 2026-09-05
 - Template 5-keputusan (tujuan/baseline/cut-list/milestones) → **roadmap + kerangka +
   sitasi terkurasi + usul node** yang mendarat di `library/`. **BUKAN** bab materi
   yang dibaca. Sintesis penjelasan just-in-time tetap lewat `artifacts/` → gerbang 403
   (§7 2026-09-04); ia tak pernah diparkir di `library/` sebagai bacaan pra-attempt.
-- **Gate keras:** tiap entri peta wajib `source_ref` yang **ADA** di `data/sources.yaml`
-  (reuse disiplin R3/M5). Peta tanpa sitasi verifiable = ditolak.
+- **Gate keras (dinaikkan 2026-09-05):** bukan lagi sekadar "`source_ref` ADA di
+  `data/sources.yaml`" — itu *self-satisfying* begitu AI boleh menulis ke registry.
+  Sekarang: teks sumber wajib **di-snapshot** ke `data/sources/<id>.md` oleh script
+  (`fetch_source.py`, isinya tak pernah diketik AI) dan tiap entri peta wajib membawa
+  **kutipan verbatim** yang dicek substring lewat `app/services/grounding.py` — mesin
+  yang sama dengan gate R3/M7. Efek samping yang disengaja: ini **menghidupkan lajur
+  403/R3** yang mati sejak M7 karena snapshot belum pernah ada.
+- **Plan eksekusi lengkap:** [`execution-plan-L3-learn-intake.md`](execution-plan-L3-learn-intake.md)
+  (5 berkas, kode acuan, test, urutan build gerbang-dulu, smoke, DoD).
 - **Acceptance:** roadmap generate punya sitasi + tiap bagian mengusulkan kandidat node;
   nol prosa penjelasan sintesis mendarat di `library/`.
+- ✅ **Terkirim (2026-09-05):** `scripts/_console.py` · `scripts/fetch_source.py`
+  (+ `test_fetch_source.py`) · `kind: roadmap` + `check_grounding()` di
+  `library_scaffold.py` · `roadmap_errors()` di `verify_library.py` · skill
+  `.claude/skills/learn-intake/`. Aturan kutipan **di-import** dari
+  `app/services/grounding.py`, tidak disalin. 53 test hijau (24 lama tetap hijau),
+  `ruff` tanpa temuan baru, smoke end-to-end lolos termasuk **dua uji penolakan**
+  (kutipan diubah satu huruf → exit 2, nol berkas ditulis; blok kode di peta → gerbang
+  baca exit 1). Keputusan tercatat di CLAUDE.md §7 (2026-09-05).
+- ✅ **Bonus yang terbukti:** `data/sources/` kini berisi snapshot nyata yang ter-commit
+  — bahan yang ditunggu gate R3 sejak M7 (`NO_SNAPSHOT`).
 
 ### L4 — Jembatan Library→Forge
 - Usulan node dari L3 masuk **pipeline authoring yang sudah ada** (R4 → gate mesin
@@ -155,4 +172,20 @@ menambah risiko.
   5 crux diputuskan (TODO-marker · skill+verify_library · overwrite · target tunggal ·
   refs opsional-tervalidasi). Detail & bukti:
   [`execution-plan-L2-note-refine.md`](execution-plan-L2-note-refine.md) §9.
-- ▶️ **L3 `learn-intake` + grounding berikutnya** (fase risiko §8). Belum ada plan eksekusi.
+- ✅ **L3 SELESAI & TERVERIFIKASI** (2026-09-05): skill `learn-intake` +
+  `scripts/fetch_source.py` + `scripts/_console.py` + perluasan `library_scaffold.py`
+  (`kind: roadmap`, gerbang TULIS `check_grounding`) & `verify_library.py` (gerbang BACA
+  `roadmap_errors`) + entri §7 CLAUDE.md. **53 test hijau** (24 lama tetap hijau + 9
+  `fetch_source` + 9 validator L3 + 11 scaffolder L3), `ruff` tanpa temuan baru, validator
+  atas `library/` hijau, smoke end-to-end lulus termasuk dua uji penolakan. `data/sources/`
+  berisi 2 snapshot nyata yang ter-commit — R3 hidup lagi. Rencananya:
+  [`execution-plan-L3-learn-intake.md`](execution-plan-L3-learn-intake.md). Pendekatan
+  **A** ("peta ter-snapshot") dipilih dari 5 alternatif; 9 keputusan dikunci (KUNCI 1–9),
+  di antaranya: gerbang = snapshot + kutipan verbatim (bukan "id terdaftar"), isi snapshot
+  tak pernah diketik AI, penulis berkas tetap scaffolder, kutipan hanya hidup di file
+  `type: roadmap`, dan batas "peta vs bab" dibuat mekanis (dilarang blok kode + batas
+  prosa 3000 karakter). Urutan build: **gerbang dulu, penulisnya belakangan** — diikuti
+  apa adanya saat eksekusi.
+- ▶️ **Berikutnya: L4 (jembatan Library→Forge)**, lalu L5 (penjaga metrik). Peringatan §4
+  berlaku makin keras sekarang: L3 membuat peta terasa seperti kurikulum, jadi tekanan
+  untuk menyegerakan L5 ("% direproduksi, bukan % dibaca") naik justru setelah fase ini.

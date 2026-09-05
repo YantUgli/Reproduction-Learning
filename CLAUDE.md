@@ -141,6 +141,17 @@ python scripts/load_nodes.py            # atau: python scripts/load_nodes.py rea
 python scripts/verify_nodes.py                 # atau: ... verify_nodes.py ml
 python scripts/verify_nodes.py --skip-starter  # 3x lebih cepat; JANGAN untuk commit
 
+# Snapshot sumber otoritatif (L3) — bahan pembanding gerbang kutipan verbatim.
+# WAJIB sebelum sebuah source_ref boleh dikutip peta Library ATAU dipakai gate R3.
+# Isinya TIDAK PERNAH diketik manusia/AI: unduhan (`fetch`) atau berkas Bryant (`manual`).
+python scripts/fetch_source.py --id fastapi_docs_first_steps
+python scripts/fetch_source.py --all              # semua sumber ber-URL yang belum ada
+python scripts/fetch_source.py --id buku_bab3 --from-file bab3.txt   # sumber non-URL
+
+# Lajur Library (L1–L3) — scaffolder (gerbang TULIS) & validator (gerbang BACA)
+python scripts/library_scaffold.py --spec <spec.yaml> [--dry-run]
+python scripts/verify_library.py                  # atau: ... --capture <file>
+
 # Runtime grading React (M6) — sekali saja, sebelum node React bisa dinilai
 cd runtime/react && npm install
 
@@ -633,3 +644,68 @@ alasan · alternatif yang ditolak.
   prosa generate — dan L2 dilarang mensintesis. *Ditolak:* citation-teeth gaya R3
   (melebur L2→L3, terlalu berat), raw-preserved verbatim (dobel konten), refuse-on-dirty-tree
   (friksi commit tiap sesi), formatter nol-AI (turun jadi linter, tak merestruktur dikte).
+
+- **2026-09-05 · L3 · `learn-intake`: peta belajar bersitasi masuk `library/` di balik
+  DUA gerbang mesin (tulis + baca); snapshot sumber `data/sources/` akhirnya lahir —
+  dan itu menghidupkan lajur R3 yang mati sejak M7.** L3 adalah fase pertama lajur
+  Library yang menaruh teks hasil riset AI ke `library/`. Yang dibangun **bukan**
+  generator materi melainkan **peta** yang menunjuk sumber asli. Gerbang penggantinya
+  (semua mesin, tak ada approve manusia — sejalan §7 2026-08-31):
+
+  (a) **Gerbang sitasi = snapshot + kutipan verbatim, bukan "id terdaftar".** Gerbang
+  lama ("`source_ref` ADA di `sources.yaml`") *self-satisfying* begitu AI boleh menulis
+  ke registry: karang sitasi, daftarkan id, lolos — celah yang diakui apa adanya di entri
+  M5 2026-08-22. L3 memakai mesin yang **sama** dengan gate R3: `MIN_QUOTE_CHARS` &
+  `normalize` **di-import** dari `backend/app/services/grounding.py`, tidak disalin (dua
+  salinan gerbang = satu gerbang yang menyimpang diam-diam).
+  (b) **Isi snapshot TIDAK PERNAH diketik AI.** `scripts/fetch_source.py` yang menulisnya:
+  unduhan HTTP (`provenance: fetch`) atau berkas yang **Bryant** sediakan (`--from-file`,
+  `provenance: manual`). Kalau AI boleh mengarang isi `data/sources/<id>.md`, pemeriksaan
+  "kutipan ⊆ snapshot" jadi melingkar. Pola yang sama dengan L1 (scaffolder yang menulis)
+  dan L2 (script yang flip status): **bagian yang menentukan dikeluarkan dari tangan AI.**
+  (c) **AI boleh menambah entri ke `sources.yaml` tanpa menunggu manusia** — pendaftaran
+  id bukan gerbangnya: URL karangan gagal diunduh → tak ada snapshot → tak ada kutipan
+  yang bisa lolos.
+  (d) **Penulis berkas tetap scaffolder deterministik.** AI merakit `spec.yaml`;
+  `library_scaffold.py` yang menyentuh disk, create-only.
+  (e) **Batas "peta vs bab" dibuat MEKANIS, bukan disiplin prompt:** dilarang code fence
+  di file `type: roadmap` (fence di peta adalah sinyal paling jujur bahwa ia berubah jadi
+  materi), prosa non-kutipan ≤ `MAX_ROADMAP_PROSE_CHARS = 3000` (preseden
+  `EXPLANATION_MAX_CHARS = 2500`), `reproduce` ≤ 200 karakter, dan tiap file roadmap
+  wajib punya `source_refs` non-kosong yang sudah ter-snapshot.
+  (f) **Gerbang dipasang dua kali di dua waktu:** `check_grounding` (TULIS — peta cacat
+  tak pernah lahir, nol berkas ditulis) dan `roadmap_errors` (BACA — menangkap suntingan
+  tangan sesudahnya, dan snapshot yang berubah karena `--force`).
+
+  **Kutipan hidup di file `type: roadmap`; catatan hidup di file `type: note`.** Aturan
+  gerbang dikunci ke `type`, bukan ke tebakan isi. Konsekuensi yang harus disadari:
+  **kutipan di file `note` TIDAK diverifikasi** — jadi sitasi generate dilarang di sana.
+  Kandidat node ditulis sebagai **teks di body peta**, bukan field frontmatter ke-9 dan
+  bukan `nodes.proposed.yaml`: belum ada konsumennya sampai L4, dan preseden M6
+  (`structural`) + M7 langkah 5 sudah menghukum "pipa tanpa konsumen" sebagai kode yang
+  tak pernah dijalankan. `node_ids` tetap kosong; node lahir di L4.
+
+  **Efek samping yang disengaja: `data/sources/` menghidupkan R3.** Job R3 selama ini
+  ditolak `NO_SNAPSHOT` (§7 2026-08-31 "Yang BELUM: … snapshot `data/sources/<id>.md`").
+  Dua snapshot nyata sudah ter-commit; satu kerja, dua lajur.
+
+  **Batas yang diterima sadar:** (1) kutipan verbatim membuktikan **kutipannya nyata**,
+  bukan bahwa kutipan itu **menopang** entri petanya — itu penalaran, dan tak ada mesin
+  di sini yang melakukannya (kalimat yang sama sudah tertulis apa adanya di
+  `grounding.py`; jangan mengklaim lebih). (2) `--from-file` adalah lubang yang disisakan
+  **sengaja** untuk sumber non-URL (buku, PDF, transkrip); penjaganya bukan mesin
+  melainkan label `provenance: manual` yang tampak di diff + larangan keras di SKILL
+  (AI tak pernah memasok berkasnya sendiri). (3) Halaman yang dirender JavaScript
+  menghasilkan snapshot pendek; script **menolaknya** (< 500 karakter) alih-alih menyimpan
+  snapshot palsu yang bisa dikutip sembarangan — jalan keluarnya `--from-file`, bukan
+  menurunkan ambang. (4) `baseline` di peta adalah teks alasan cut-list, **bukan** klaim
+  mastery: lantai sungguhan tetap `/placement` (§1.2 utuh), dan templat peta mencetak
+  kalimat itu sendiri.
+
+  *Ditolak:* (i) membiarkan gerbang lama "id terdaftar" (self-satisfying begitu AI menulis
+  registry); (ii) AI menulis `data/sources/*.md` sendiri (gerbang jadi melingkar);
+  (iii) AI menulis berkas `library/` langsung tanpa scaffolder (melepas penjaga terkuat
+  L1 justru di fase paling berisiko); (iv) menyalin aturan kutipan ke `scripts/`
+  alih-alih meng-import-nya dari `grounding.py`; (v) `nodes.proposed.yaml` di L3 (pipa
+  tanpa konsumen); (vi) memperluas aturan roadmap ke file `note` (kutipan di catatan
+  Bryant adalah tulisannya sendiri, bukan klaim generate).
