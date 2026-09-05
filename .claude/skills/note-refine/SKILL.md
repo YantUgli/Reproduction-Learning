@@ -36,10 +36,10 @@ Format & batas: [`../../../library/README.md`](../../../library/README.md).
    HANYA bila Bryant menyebut & id-nya ADA di registry (sources.yaml / data node) — kalau
    ragu, biarkan `[]`.
 5. **Flip status (deterministik):**
-   `backend/.venv/bin/python scripts/verify_library.py --capture "<path stub>"`
+   `backend/.venv/Scripts/python.exe scripts/verify_library.py --capture "<path stub>"`
    Script menolak bila body masih stub / field invalid — perbaiki lalu ulangi.
 6. **Validasi menyeluruh & lapor:**
-   `backend/.venv/bin/python scripts/verify_library.py`
+   `backend/.venv/Scripts/python.exe scripts/verify_library.py`
    Tunjukkan diff/ringkasan perubahan ke Bryant. Arahkan: buka `library/` di Obsidian.
 
 ## Batas yang dijaga (jangan dilanggar)

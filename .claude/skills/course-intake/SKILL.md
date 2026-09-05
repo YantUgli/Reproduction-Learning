@@ -25,7 +25,7 @@ di-paste Bryant, lewat scaffolder deterministik `scripts/library_scaffold.py`.
    slug modul/materi dari judul (kebab-case; a-z0-9-). source_refs & node_ids DIKOSONGKAN
    oleh scaffolder — jangan isi manual.
 4. **Jalankan scaffolder:**
-   `backend/.venv/bin/python scripts/library_scaffold.py --spec "$CLAUDE_SCRATCHPAD/spec.yaml"`
+   `backend/.venv/Scripts/python.exe scripts/library_scaffold.py --spec "$CLAUDE_SCRATCHPAD/spec.yaml"`
    (opsional dulu `--dry-run` untuk pratinjau).
 5. **Laporkan** daftar `dibuat`/`skip` apa adanya. Ingatkan: file yang sudah ada TIDAK
    ditimpa (create-only). Arahkan Bryant: buka `library/` di Obsidian; isi stub lewat
