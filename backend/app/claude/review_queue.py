@@ -28,7 +28,7 @@ from app.claude import contracts
 from app.claude.artifacts import REVIEWABLE, Job, JobStatus, Role, read_job, set_status
 from app.config import DATA_DIR
 from app.models import HypothesisSource, HypothesisStatus, Node, SkillHypothesis
-from app.services.node_loader import assemble_node, load_domain_into_db
+from app.services.node_loader import assemble_node, load_domain_into_db, load_edges
 
 #: Berkas varian yang ditulis saat promosi. Ekstensi kode diambil dari artifact
 #: (`.py` FastAPI/ML, `.jsx` React), bukan diasumsikan — versi M5 meng-hardcode `.py`
@@ -85,7 +85,11 @@ def promote(session: Session, job_id: str) -> Promotion:
     if job.role == Role.r3_explanation.value:
         promotion = _promote_r3(session, job)
     elif job.role == Role.r4_challenge.value:
-        promotion = _promote_r4(session, job)
+        promotion = (
+            _promote_node_genesis(session, job)
+            if job.request.get("mode") == "node"
+            else _promote_r4(session, job)
+        )
     else:
         promotion = _promote_r2(session, job)
 
@@ -200,6 +204,129 @@ def _promote_r4(session: Session, job: Job) -> Promotion:
         written_paths=written,
         db_effect={"variant_label": artifact.variant_label, "probe_id": artifact.probe.id},
     )
+
+
+def _promote_node_genesis(session: Session, job: Job) -> Promotion:
+    """Tulis NODE BARU ke `data/` + DB (L4). Semua-atau-tak-ada.
+
+    Node setengah jadi bukan cuma jelek: `assemble_node` menolak node dengan < 2 varian,
+    dan `load_nodes.py` memuat per-DOMAIN — jadi satu folder cacat mematikan seluruh
+    domain, bukan cuma dirinya. Karena itu rollback di sini menghapus folder node DAN
+    mengembalikan `edges.yaml` ke isi persisnya semula.
+    """
+    artifact = contracts.load_node_genesis(job.dir, job.request)
+    node_id = artifact.node.id
+    domain_dir = DATA_DIR / "domains" / artifact.node.domain_id
+    target = domain_dir / "nodes" / node_id
+    edges_path = domain_dir / "edges.yaml"
+
+    if target.exists():
+        raise PromotionError(f"folder node {node_id!r} sudah ada — ganti slug atau hapus dulu")
+    if session.get(Node, node_id):
+        raise PromotionError(f"node {node_id!r} sudah terdaftar di DB")
+
+    edges_backup = edges_path.read_text(encoding="utf-8") if edges_path.exists() else None
+    written: list[str] = []
+    try:
+        (target / "probes").mkdir(parents=True)
+        _dump_yaml(target / "node.yaml", artifact.node.model_dump(mode="json"))
+        written.append(_rel(target / "node.yaml"))
+
+        for variant in artifact.variants:
+            vdir = target / "instances" / variant.variant_label
+            vdir.mkdir(parents=True)
+            isi = {
+                _PROMPT_FILE: variant.prompt_md,
+                f"starter_code{variant.file_ext}": variant.starter_code,
+                f"reference_solution{variant.file_ext}": variant.reference_solution,
+                f"hidden_test{variant.file_ext}": variant.hidden_test,
+            }
+            if variant.expected_json.strip():
+                # Node ML membawa toleransi numeriknya di `expected.json` (M6).
+                isi["expected.json"] = variant.expected_json
+            for nama, teks in isi.items():
+                (vdir / nama).write_text(teks, encoding="utf-8")
+                written.append(_rel(vdir / nama))
+
+        probe_path = target / "probes" / f"{artifact.probe.id}.yaml"
+        _dump_yaml(probe_path, artifact.probe.model_dump(mode="json"))
+        written.append(_rel(probe_path))
+
+        prereq = job.request.get("prereq_node_id") or ""
+        if prereq:
+            _append_soft_edge(
+                edges_path,
+                from_id=prereq,
+                to_id=node_id,
+                source_ref_id=job.request["source_ref_id"],
+                library_file=job.request["library_file"],
+            )
+            written.append(_rel(edges_path))
+
+        # Validasi M2 berlaku PENUH untuk output AI (sama seperti _promote_r4).
+        assemble_node(target)
+        load_domain_into_db(session, domain_dir, data_dir=DATA_DIR)
+    except Exception as e:  # noqa: BLE001 — rollback file, lalu laporkan apa adanya
+        shutil.rmtree(target, ignore_errors=True)
+        if edges_backup is not None:
+            edges_path.write_text(edges_backup, encoding="utf-8")
+        raise PromotionError(f"promosi dibatalkan, node akan menjadi tak sah: {e}") from e
+
+    return Promotion(
+        job_id=job.id,
+        role=job.role,
+        node_id=node_id,
+        written_paths=written,
+        db_effect={
+            "variants": [v.variant_label for v in artifact.variants],
+            "probe_id": artifact.probe.id,
+            "soft_edge_from": job.request.get("prereq_node_id", ""),
+            "library_file": job.request["library_file"],
+        },
+    )
+
+
+def _dump_yaml(path: Path, data: dict) -> None:
+    """Satu gaya dump untuk seluruh berkas hasil promosi — supaya node buatan AI
+    ter-diff sama bentuknya dengan node tulisan tangan.
+
+    `mode="json"` di pemanggil: `grader_type`/`type` adalah StrEnum, dan yaml tak bisa
+    merepresentasikan objek enum — berkasnya harus berisi string biasa.
+    """
+    path.write_text(
+        yaml.dump(
+            data, Dumper=_IndentedDumper, allow_unicode=True, sort_keys=False, width=200
+        ),
+        encoding="utf-8",
+    )
+
+
+def _append_soft_edge(
+    edges_path: Path, *, from_id: str, to_id: str, source_ref_id: str, library_file: str
+) -> None:
+    """Tambah SATU edge `soft` lewat APPEND TEKS, lalu buktikan berkasnya masih parse.
+
+    Ditulis sebagai teks, bukan `yaml.dump` ulang: `edges.yaml` penuh komentar kurasi
+    ("difinalkan Isyah 2026-08-22 …") dan dumper akan menghapusnya diam-diam.
+
+    Selalu `soft` (§7 2026-09-01): edge `hard` yang salah mengunci Bryant KELUAR dari
+    node yang sebenarnya siap ia kerjakan; edge `soft` yang salah cuma saran keliru.
+    """
+    blok = (
+        f"\n  # Usul L4 (AI) dari peta Library: {library_file}\n"
+        f"  - from: {from_id}\n"
+        f"    to: {to_id}\n"
+        f"    type: soft\n"
+        f"    source_ref_id: {source_ref_id}\n"
+        f'    note: "Usulan L4 — menyarankan urutan, tidak mengunci."\n'
+    )
+    if edges_path.exists():
+        edges_path.write_text(
+            edges_path.read_text(encoding="utf-8").rstrip("\n") + "\n" + blok, encoding="utf-8"
+        )
+    else:
+        edges_path.write_text("edges:\n" + blok, encoding="utf-8")
+    load_edges(edges_path)  # gagal parse → exception → rollback di pemanggil
 
 
 def _promote_r2(session: Session, job: Job) -> Promotion:

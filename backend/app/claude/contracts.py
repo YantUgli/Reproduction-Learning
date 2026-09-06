@@ -29,7 +29,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import EXPLANATION_MAX_CHARS
-from app.services.node_schema import ProbeYaml
+from app.services.node_schema import NodeYaml, ProbeYaml
 
 _VARIANT_RE = re.compile(r"^variant_[a-z0-9_]+$")
 
@@ -52,6 +52,31 @@ _TEST_RULES: dict[str, tuple[re.Pattern, re.Pattern, str]] = {
     ),
 }
 _DEFAULT_TEST_EXT = ".py"
+
+
+def check_test_references_solution(hidden_test: str, file_ext: str) -> None:
+    """Hidden test WAJIB benar-benar memanggil submisi user.
+
+    Ini murah tapi menutup satu kegagalan mahal: test yang tak pernah menyentuh
+    `solution` bisa hijau di apa saja, termasuk di berkas kosong. Pemeriksaan
+    eksekusinya sendiri (triad) ada di `services/quality_gate.py`; yang di sini
+    cuma memastikan bentuknya masuk akal sebelum kita membayar ongkos eksekusi.
+
+    Fungsi modul, bukan method: R4 varian (`ChallengeArtifact`) dan R4 node
+    (`NodeVariant`) menuntut aturan yang SAMA PERSIS, dan aturan yang hidup di dua
+    salinan cepat atau lambat akan berbeda — yang lebih longgar yang akan dipakai.
+    Preseden yang sudah dipegang proyek ini: gate R4 & `verify_nodes.py` sama-sama
+    memanggil `quality_gate.run_triad` justru supaya tak ada dua salinan aturan.
+    """
+    rule = _TEST_RULES.get(file_ext)
+    if rule is None:
+        raise ValueError(
+            f"ekstensi berkas {file_ext!r} belum didukung kontrak R4 "
+            f"(terdaftar: {sorted(_TEST_RULES)})"
+        )
+    imports_re, test_re, expectation = rule
+    if not imports_re.search(hidden_test) or not test_re.search(hidden_test):
+        raise ValueError(f"hidden_test{file_ext} harus {expectation}")
 
 
 class ArtifactError(ValueError):
@@ -142,22 +167,7 @@ class ChallengeArtifact(BaseModel):
 
     @model_validator(mode="after")
     def _test_references_solution(self):
-        """Hidden test WAJIB benar-benar memanggil submisi user.
-
-        Ini murah tapi menutup satu kegagalan mahal: test yang tak pernah menyentuh
-        `solution` bisa hijau di apa saja, termasuk di berkas kosong. Pemeriksaan
-        eksekusinya sendiri (triad) ada di `services/quality_gate.py`; yang di sini
-        cuma memastikan bentuknya masuk akal sebelum kita membayar ongkos eksekusi.
-        """
-        rule = _TEST_RULES.get(self.file_ext)
-        if rule is None:
-            raise ValueError(
-                f"ekstensi berkas {self.file_ext!r} belum didukung kontrak R4 "
-                f"(terdaftar: {sorted(_TEST_RULES)})"
-            )
-        imports_re, test_re, expectation = rule
-        if not imports_re.search(self.hidden_test) or not test_re.search(self.hidden_test):
-            raise ValueError(f"hidden_test{self.file_ext} harus {expectation}")
+        check_test_references_solution(self.hidden_test, self.file_ext)
         return self
 
     @model_validator(mode="after")
@@ -165,6 +175,103 @@ class ChallengeArtifact(BaseModel):
         if self.probe.node_id != self.node_id:
             raise ValueError(
                 f"probe.node_id {self.probe.node_id!r} != node_id artifact {self.node_id!r}"
+            )
+        return self
+
+
+# --------------------------------------------------------------------------- #
+# R4 mode `node` — kelahiran node baru dari peta Library (L4)
+# --------------------------------------------------------------------------- #
+#: Node sah butuh >= 2 varian (`node_loader._MIN_INSTANCES`). Angkanya diulang di sini
+#: dengan sadar: kontrak menolak SEBELUM eksekusi mahal dijalankan, loader menolak
+#: sesudahnya. Kalau salah satu berubah, `test_min_variants_sejalan` berteriak.
+_MIN_VARIANTS = 2
+
+
+class NodeVariant(BaseModel):
+    """Satu folder `instances/<label>/` — bentuknya sama dengan node folder M2."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    variant_label: str
+    prompt_md: str
+    starter_code: str
+    reference_solution: str
+    hidden_test: str
+    file_ext: str = _DEFAULT_TEST_EXT
+    expected_json: str = ""
+
+    @field_validator("variant_label")
+    @classmethod
+    def _label_shape(cls, v: str) -> str:
+        if not _VARIANT_RE.match(v):
+            raise ValueError(f"variant_label harus 'variant_<slug>', dapat {v!r}")
+        return v
+
+    @field_validator("prompt_md", "reference_solution")
+    @classmethod
+    def _nonempty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("field wajib ini kosong")
+        return v
+
+    @model_validator(mode="after")
+    def _test_shape(self):
+        check_test_references_solution(self.hidden_test, self.file_ext)
+        return self
+
+
+class NodeGenesisArtifact(BaseModel):
+    """NODE BARU utuh (L4): `node.yaml` + >=2 varian + 1 probe + sitasi terverifikasi.
+
+    Bentuknya sengaja mengikuti folder node M2 supaya promosi jadi PENYALINAN, bukan
+    penerjemahan — penerjemah adalah tempat lahir kebocoran (M6/M7 sudah membayar tiga
+    kali: ekstensi `.py` yang di-hardcode di gate, di kontrak, dan di promosi).
+
+    `NodeYaml`/`ProbeYaml` di-import dari `services/node_schema`, tidak ditulis ulang:
+    yang dipakai loader dan yang dipakai gate harus benda yang sama.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    node: NodeYaml
+    variants: list[NodeVariant]
+    probe: ProbeYaml
+    citation: Citation
+
+    @property
+    def file_ext(self) -> str:
+        return self.variants[0].file_ext
+
+    @model_validator(mode="after")
+    def _shape(self):
+        if len(self.variants) < _MIN_VARIANTS:
+            raise ValueError(
+                f"node baru butuh >= {_MIN_VARIANTS} varian (transfer, bukan hafalan), "
+                f"dapat {len(self.variants)}"
+            )
+        labels = [v.variant_label for v in self.variants]
+        if len(set(labels)) != len(labels):
+            raise ValueError(f"label varian duplikat: {labels}")
+        exts = {v.file_ext for v in self.variants}
+        if len(exts) != 1:
+            raise ValueError(
+                f"varian bercampur ekstensi {sorted(exts)} — satu node satu bahasa"
+            )
+        if self.probe.node_id != self.node.id:
+            raise ValueError(f"probe.node_id {self.probe.node_id!r} != node {self.node.id!r}")
+        # Sama seperti gate R4 varian (§7 2026-09-01): di jalur AI tak ada penulis yang
+        # bisa ditanya, jadi jawabannya wajib nilai yang persis keluar dari eksekusi.
+        if not self.probe.snippet.strip():
+            raise ValueError(
+                "probe tanpa `snippet` — kunci jawabannya tak bisa dibuktikan mesin"
+            )
+        if self.probe.expected_value.strip():
+            raise ValueError("probe buatan AI dilarang memakai `expected_value`")
+        if self.citation.source_ref_id not in self.node.source_refs:
+            raise ValueError(
+                f"citation.source_ref_id {self.citation.source_ref_id!r} tak ada di "
+                f"node.source_refs {self.node.source_refs}"
             )
         return self
 
@@ -285,6 +392,72 @@ def load_challenge(job_dir: Path, node_id: str) -> ChallengeArtifact:
         )
 
     return _wrap(build, "artifact R4 tak valid")
+
+
+def load_node_genesis(job_dir: Path, request: dict) -> NodeGenesisArtifact:
+    """Baca artifact R4 mode `node`, lalu TEGAKKAN identitas yang diminta trigger.
+
+    Berkas kode ditemukan dari NAMA DASAR (`reference_solution.*`), bukan dari ekstensi
+    yang diasumsikan `.py` — kebocoran yang sama yang M6 tutup di `node_loader` dan M7
+    di `load_challenge`.
+    """
+
+    def build() -> NodeGenesisArtifact:
+        variants = []
+        for label in request["variant_labels"]:
+            vdir = job_dir / "instances" / label
+            hidden = _find(vdir, "hidden_test")
+            variants.append(
+                NodeVariant(
+                    variant_label=label,
+                    prompt_md=_read(vdir / "prompt.md"),
+                    starter_code=_read_found(vdir, "starter_code"),
+                    reference_solution=_read_found(vdir, "reference_solution"),
+                    hidden_test=_read(hidden),
+                    file_ext=hidden.suffix,
+                    expected_json=_read_found(vdir, "expected", required=False),
+                )
+            )
+        artifact = NodeGenesisArtifact(
+            node=yaml.safe_load(_read(job_dir / "node.yaml")),
+            variants=variants,
+            probe=yaml.safe_load(_read(job_dir / "probe.yaml")),
+            citation=json.loads(_read(job_dir / "citation.json")),
+        )
+        _require_identity(artifact, request)
+        return artifact
+
+    return _wrap(build, "artifact R4 (node) tak valid")
+
+
+def _require_identity(artifact: NodeGenesisArtifact, request: dict) -> None:
+    """Identitas ditetapkan MESIN (L4 KUNCI 4). Model yang menggantinya = artifact ditolak.
+
+    Yang boleh dikarang model hanyalah ISI: prompt, kode, test, probe. Penamaan yang
+    dikarang model adalah cara termurah membuat kurikulum berantakan tanpa satu pun
+    gerbang berbunyi — dan `grader_type` yang dikarang adalah cara memilih gerbang yang
+    paling mudah dilewati.
+    """
+    diffs = []
+    for field_name, want in (
+        ("id", request["node_id"]),
+        ("domain_id", request["domain_id"]),
+        ("grader_type", request["grader_type"]),
+    ):
+        got = str(getattr(artifact.node, field_name))
+        if got != str(want):
+            diffs.append(f"node.{field_name}={got!r} != {want!r}")
+    if artifact.probe.id != request["probe_id"]:
+        diffs.append(f"probe.id={artifact.probe.id!r} != {request['probe_id']!r}")
+    if artifact.file_ext != request["file_ext"]:
+        diffs.append(f"ekstensi {artifact.file_ext!r} != {request['file_ext']!r}")
+    if artifact.citation.source_ref_id != request["source_ref_id"]:
+        diffs.append(
+            f"citation.source_ref_id={artifact.citation.source_ref_id!r} != "
+            f"{request['source_ref_id']!r}"
+        )
+    if diffs:
+        raise ValueError("identitas node tak boleh dikarang model: " + "; ".join(diffs))
 
 
 def load_hypotheses(job_dir: Path) -> HypothesesArtifact:

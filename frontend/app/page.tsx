@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { api, type DueItem, type NodeStat, type Stats } from "../lib/api";
+import {
+  api,
+  type DueItem,
+  type LibraryProgress,
+  type NodeStat,
+  type Stats,
+} from "../lib/api";
 import StatusBadge from "./components/StatusBadge";
 import Card from "./components/ui/Card";
 import Container from "./components/ui/Container";
@@ -22,14 +28,18 @@ import { IconArrowRight, IconInbox, IconLock } from "./components/ui/Icon";
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [due, setDue] = useState<DueItem[] | null>(null);
+  const [lib, setLib] = useState<LibraryProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = () => {
     setError(null);
-    Promise.all([api.getStats(), api.listDue()])
-      .then(([s, d]) => {
+    // KPI Library boleh kosong tanpa merobohkan dashboard: lajur Library adalah
+    // pendamping, bukan sumber KPI inti (`/stats`).
+    Promise.all([api.getStats(), api.listDue(), api.getLibraryProgress().catch(() => null)])
+      .then(([s, d, l]) => {
         setStats(s);
         setDue(d);
+        setLib(l);
       })
       .catch((e) => setError(String(e)));
   };
@@ -51,7 +61,7 @@ export default function Dashboard() {
 
       {stats && (
         <>
-          <KpiRow stats={stats} />
+          <KpiRow stats={stats} lib={lib} />
           <DueSection due={due ?? []} />
           <ProgressMap stats={stats} />
         </>
@@ -61,13 +71,13 @@ export default function Dashboard() {
 }
 
 /** KPI inti PRD §9: pass rate reproduce-without-AI & jumlah node mastered. */
-function KpiRow({ stats }: { stats: Stats }) {
+function KpiRow({ stats, lib }: { stats: Stats; lib: LibraryProgress | null }) {
   const rate =
     stats.reproduce_pass_rate === null
       ? "—"
       : `${Math.round(stats.reproduce_pass_rate * 100)}%`;
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <Kpi
         label="reproduce-without-AI"
         value={rate}
@@ -83,8 +93,30 @@ function KpiRow({ stats }: { stats: Stats }) {
         value={`${stats.due_count}`}
         hint={stats.due_count > 0 ? "perlu direview hari ini" : "tak ada yang menunggu"}
       />
+      {/* L5 — "% direproduksi", bukan "% dibaca". Satu angka saja di dashboard;
+          daftar course-nya tinggal di /library (Forge yang harus terasa utama). */}
+      <Kpi
+        label="materi direproduksi"
+        value={libPct(lib)}
+        hint={
+          lib && lib.total > 0
+            ? `${lib.reproduced}/${lib.total} materi Library terbukti`
+            : "library/ kosong"
+        }
+      />
     </div>
   );
+}
+
+/** Sama seperti di /library: jangan pernah menampilkan 100% selama masih ada materi
+ *  yang belum terbukti — pembulatan yang berbohong ke atas adalah persis jenis
+ *  kenyamanan yang lajur ini dibangun untuk melawan. */
+function libPct(lib: LibraryProgress | null): string {
+  if (!lib || lib.reproduced_pct === null) return "—";
+  let p = Math.round(lib.reproduced_pct * 100);
+  if (lib.reproduced < lib.total && p >= 100) p = 99;
+  if (lib.reproduced > 0 && p <= 0) p = 1;
+  return `${p}%`;
 }
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
@@ -105,6 +137,9 @@ function DueSection({ due }: { due: DueItem[] }) {
         <span className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <Link href="/placement" className="inline-flex items-center gap-1 text-accent hover:underline">
             Jalankan placement <IconArrowRight size={14} />
+          </Link>
+          <Link href="/library" className="inline-flex items-center gap-1 text-accent hover:underline">
+            Library <IconArrowRight size={14} />
           </Link>
           {/* Meja kerja Isyah (M5), bukan jalur belajar Bryant. */}
           <Link href="/authoring" className="inline-flex items-center gap-1 text-accent hover:underline">

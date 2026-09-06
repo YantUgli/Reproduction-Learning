@@ -33,6 +33,7 @@ import json
 import re
 from pathlib import Path
 
+import yaml
 from sqlmodel import Session, select
 
 from app.claude import contracts
@@ -131,6 +132,171 @@ def trigger_r4(session: Session, *, node_id: str, variant_label: str | None = No
     return job
 
 
+#: `n013_depends_shared_params` -> ("n", "013"). Dipakai untuk MEWARISI konvensi
+#: penamaan domain, bukan menciptakan konvensi baru per node.
+_NODE_ID_RE = re.compile(r"^([a-z])(\d+)_")
+
+
+def _domain_nodes(session: Session, domain_id: str) -> list[Node]:
+    nodes = session.exec(select(Node).where(Node.domain_id == domain_id)).all()
+    return sorted(nodes, key=_by_id)
+
+
+def _next_node_id(existing: list[Node], slug: str) -> str:
+    """`[n013…]` + "get-route-json" -> `n014_get_route_json`.
+
+    Prefix & lebar angka DIWARISI dari node yang sudah ada di domain itu, tidak
+    di-hardcode: domain ML memakai `m…`, React `r…`, dan menebaknya di sini berarti
+    L4 melahirkan node dengan konvensi penamaan yang bercabang diam-diam.
+    """
+    prefix, width, top = "n", 3, 0
+    for node in existing:
+        m = _NODE_ID_RE.match(node.id)
+        if m:
+            prefix, width = m.group(1), len(m.group(2))
+            top = max(top, int(m.group(2)))
+    return f"{prefix}{top + 1:0{width}d}_{slug.replace('-', '_')}"
+
+
+def _probe_id_for(node_id: str, urutan: int) -> str:
+    """Konvensi tulisan tangan: `n014_probe_01` / `m004_probe_01`, bukan nama node penuh."""
+    m = _NODE_ID_RE.match(node_id)
+    prefix = node_id[: m.end() - 1] if m else node_id
+    return f"{prefix}_probe_{urutan:02d}"
+
+
+def _library_material(library_file: str, source_ref_id: str) -> str:
+    """Validasi berkas materi Library asal node. Kembalikan path POSIX relatif-repo.
+
+    Tiga pemeriksaan, semuanya murah dan semuanya menutup kesalahan yang mahal:
+    berkasnya benar-benar di `library/`, BELUM tertaut node lain, dan berdiri di
+    sumber yang SAMA dengan node yang akan lahir (L4 KUNCI 6) — itu yang membuat
+    jembatannya bukan sekadar nama berkas yang kebetulan mirip.
+    """
+    path = (REPO_ROOT / library_file).resolve()
+    # Sengaja diturunkan dari REPO_ROOT modul ini, BUKAN `config.LIBRARY_DIR` (L5):
+    # seluruh fungsi ini berjangkar di REPO_ROOT (lihat `relative_to` di bawah), dan
+    # test L4 mem-patch `jobs.REPO_ROOT` ke tmp. Memakai LIBRARY_DIR di sini akan
+    # membuat pemeriksaan containment mengabaikan root yang sedang di-patch.
+    library_root = (REPO_ROOT / "library").resolve()
+    if not path.is_file() or library_root not in path.parents:
+        raise JobError(f"library_file {library_file!r} bukan berkas di dalam library/")
+    text = path.read_text(encoding="utf-8")
+    fm = yaml.safe_load(text.split("---", 2)[1]) if text.startswith("---") else None
+    if not isinstance(fm, dict):
+        raise JobError(f"{library_file}: frontmatter tak terbaca")
+    if fm.get("node_ids"):
+        raise JobError(f"{library_file}: sudah tertaut ke node {fm['node_ids']}")
+    if source_ref_id not in (fm.get("source_refs") or []):
+        raise JobError(
+            f"{library_file}: source_refs-nya tak memuat {source_ref_id!r} — node dan "
+            "materinya harus berdiri di sumber yang sama"
+        )
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
+def trigger_r4_node(
+    session: Session,
+    *,
+    library_file: str,
+    slug: str,
+    domain_id: str,
+    concept: str,
+    source_ref_id: str,
+    prereq_node_id: str | None = None,
+) -> Job:
+    """NODE BARU dari satu entri peta Library (L4).
+
+    Identitas node — id, domain, grader, label varian, id probe, ekstensi berkas —
+    dihitung DI SINI dari isi `data/`, lalu DIPAKSAKAN ke artifact
+    (`contracts._require_identity`). Yang boleh dikarang model hanyalah ISI: prompt,
+    kode, test, probe. Penamaan yang dikarang model adalah cara termurah membuat
+    kurikulum berantakan tanpa satu pun gerbang berbunyi.
+
+    `grader_type` diwarisi dari node contoh di domain yang sama, bukan dari tabel
+    domain->grader baru: domain tanpa satu pun node tak bisa jadi target L4 — sekaligus
+    alasan mengapa "domain baru" (= grader baru, pekerjaan gaya M6) di luar ruang lingkup.
+    """
+    if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", slug):
+        raise JobError(f"slug harus kebab-case: {slug!r}")
+
+    nodes = _domain_nodes(session, domain_id)
+    if not nodes:
+        raise JobError(
+            f"domain {domain_id!r} belum punya satu pun node contoh — domain baru butuh "
+            "grader baru (pekerjaan gaya M6), bukan L4"
+        )
+    exemplar = nodes[-1]
+    example = _first_instance(session, exemplar.id)
+    if example is None:
+        raise JobError(f"node contoh {exemplar.id} tak punya instance untuk dicontoh")
+
+    known = {s.id for s in load_sources(DATA_DIR / "sources.yaml")}
+    if source_ref_id not in known:
+        raise JobError(f"source_ref {source_ref_id!r} tak ada di sources.yaml")
+    if not grounding.has_snapshot(source_ref_id):
+        raise JobError(
+            f"{source_ref_id} belum di-snapshot — jalankan "
+            f"scripts/fetch_source.py --id {source_ref_id} (L3)"
+        )
+
+    material = _library_material(library_file, source_ref_id)
+    node_id = _next_node_id(nodes, slug)
+    if session.get(Node, node_id):
+        raise JobError(f"node {node_id!r} sudah ada")
+    if prereq_node_id:
+        prereq = session.get(Node, prereq_node_id)
+        if prereq is None or prereq.domain_id != domain_id:
+            raise JobError(f"prereq {prereq_node_id!r} tak ada di domain {domain_id!r}")
+
+    hidden_path = REPO_ROOT / example.hidden_test_path
+    example_dir, ext = hidden_path.parent, hidden_path.suffix
+    probe_id = _probe_id_for(node_id, 1)
+    labels = ["variant_a", "variant_b"]
+
+    prompt = render(
+        "r4_node",
+        {
+            "node_id": node_id,
+            "domain_id": domain_id,
+            "concept": concept,
+            "grader_type": str(exemplar.grader_type),
+            "file_ext": ext,
+            "source_ref_id": source_ref_id,
+            "probe_id": probe_id,
+            "variant_labels": ", ".join(labels),
+            "example_node_id": exemplar.id,
+            "example_node_yaml": _read_or_empty(
+                DATA_DIR / "domains" / domain_id / "nodes" / exemplar.id / "node.yaml"
+            ),
+            "example_prompt": example.prompt,
+            "example_reference": _read_or_empty(
+                _find_variant_file(example_dir, "reference_solution")
+            ),
+            "example_test": _read_or_empty(hidden_path),
+        },
+    )
+    job = new_job(
+        Role.r4_challenge,
+        request={
+            "mode": "node",
+            "node_id": node_id,
+            "domain_id": domain_id,
+            "grader_type": str(exemplar.grader_type),
+            "file_ext": ext,
+            "concept": concept,
+            "source_ref_id": source_ref_id,
+            "library_file": material,
+            "prereq_node_id": prereq_node_id or "",
+            "variant_labels": labels,
+            "probe_id": probe_id,
+        },
+        prompt_version=prompt.version,
+    )
+    (job.dir / "prompt.md").write_text(prompt.text, encoding="utf-8")
+    return job
+
+
 def trigger_r2(session: Session, *, repo_path: str, node_ids: list[str] | None = None) -> Job:
     """Bukti codebase → hipotesis (tak pernah verdict)."""
     path = Path(repo_path)
@@ -197,7 +363,11 @@ def execute_job(
             continue
 
         if job.role == Role.r4_challenge.value:
-            gate = _gate_r4(job, session)
+            gate = (
+                _gate_r4_node(job, session)
+                if job.request.get("mode") == "node"
+                else _gate_r4(job, session)
+            )
             job.gate = gate
             if not gate["passed"]:
                 last_error = gate["reason"]
@@ -278,6 +448,26 @@ def _validate(job: Job, session: Session) -> dict:
         }
 
     if job.role == Role.r4_challenge.value:
+        if job.request.get("mode") == "node":
+            artifact = contracts.load_node_genesis(job.dir, job.request)
+            problems = grounding.check_quotes([artifact.citation])
+            if problems:
+                # Beda dari R3: di sini "belum di-snapshot" MUSTAHIL — trigger sudah
+                # menolaknya di depan. Jadi setiap masalah berarti sitasinya cacat,
+                # dan tak ada yang perlu ditahan-tahan.
+                raise contracts.ArtifactError(
+                    "sitasi node tak lolos grounding verbatim: "
+                    + "; ".join(str(p) for p in problems)
+                )
+            return {
+                "mode": "node",
+                "node_id": artifact.node.id,
+                "variants": [v.variant_label for v in artifact.variants],
+                "probe_id": artifact.probe.id,
+                "estimated_minutes": artifact.node.estimated_minutes,
+                "quote": artifact.citation.quote[:120],
+            }
+
         artifact = contracts.load_challenge(job.dir, node_id)
         expected = job.request.get("variant_label")
         if expected and artifact.variant_label != expected:
@@ -393,6 +583,65 @@ def _gate_r4(job: Job, session: Session) -> dict:
     return gate
 
 
+def _gate_r4_node(job: Job, session: Session) -> dict:
+    """GERBANG node baru (L4): TRIAD untuk SETIAP varian + probe DIJALANKAN.
+
+    Node baru tak boleh masuk dengan standar lebih longgar daripada varian tambahan
+    (M7 langkah 1) atau node tulisan tangan (`verify_nodes.py`) — ketiganya memanggil
+    `quality_gate.run_triad`. Biayanya ~2x waktu gate varian; itu harga sebuah node
+    yang tak memalsukan sinyal inti produk.
+
+    Beda dari `_gate_r4`: node-nya BELUM ada di DB, jadi grader diambil dari `node.yaml`
+    artifact. Itu aman HANYA karena `contracts._require_identity` sudah memaksa
+    `grader_type` sama dengan yang ditetapkan trigger — jangan longgarkan salah satunya
+    tanpa yang lain, kalau tidak model bisa memilih grader yang paling mudah dilewati.
+    """
+    artifact = contracts.load_node_genesis(job.dir, job.request)
+    grader = get_grader(artifact.node.grader_type)
+    gate: dict = {"passed": True, "reason": "", "variants": {}}
+
+    for variant in artifact.variants:
+        vdir = job.dir / "instances" / variant.variant_label
+        hidden = _find_variant_file(vdir, "hidden_test")
+        instance = ChallengeInstance(
+            id=f"{artifact.node.id}__gate_{job.id}_{variant.variant_label}",
+            node_id=artifact.node.id,
+            variant_label=variant.variant_label,
+            prompt="",
+            starter_code="",
+            signature_contract="",
+            hidden_test_path=repo_pointer(hidden),
+            scaffold_level="L2",
+        )
+        triad = run_triad(
+            grader,
+            instance,
+            reference=variant.reference_solution,
+            starter=variant.starter_code,
+        )
+        failing = triad.failing
+        gate["variants"][variant.variant_label] = {
+            "passed": triad.ok,
+            "reason": triad.reason,
+            "output": failing.output if failing else "",
+        }
+        if not triad.ok:
+            gate["passed"] = False
+            gate["reason"] = f"{variant.variant_label}: {triad.reason}"
+            return gate  # berhenti di kegagalan pertama — sisanya tak menambah informasi
+
+    # Probe buatan AI: kunci jawabannya DIJALANKAN, tak cukup "ada di options".
+    # `snippet` wajib & `expected_value` terlarang sudah ditegakkan kontrak
+    # (`NodeGenesisArtifact._shape`), jadi di sini tinggal membuktikannya lewat eksekusi.
+    verdict = verify_probe(artifact.probe, file_ext=artifact.file_ext)
+    gate["probe_verified"] = verdict.ok and not verdict.skipped
+    if not verdict.ok:
+        gate["passed"] = False
+        gate["reason"] = f"probe ditolak: {verdict.reason}"
+        gate["output"] = verdict.output
+    return gate
+
+
 def _find_variant_file(variant_dir: Path, stem: str) -> Path:
     """Berkas instance dari NAMA DASAR — `.py` (FastAPI/ML) maupun `.jsx` (React)."""
     found = find_instance_file(variant_dir, stem)
@@ -463,9 +712,12 @@ def _next_probe_id(session: Session, node_id: str) -> str:
     count = len(
         session.exec(select(ComprehensionProbe).where(ComprehensionProbe.node_id == node_id)).all()
     )
-    match = re.match(r"^(n\d+)", node_id)
-    prefix = match.group(1) if match else node_id
-    return f"{prefix}_probe_{count + 1:02d}"
+    # Dulu regex-nya `^(n\d+)` — hanya cocok untuk id domain FastAPI, dan buktinya
+    # sudah ada di kurikulum: probe ML tulisan tangan bernama `m001_probe_01`, sedangkan
+    # probe buatan AI di node yang sama jatuh ke fallback "nama node penuh" dan jadi
+    # `m002_sigmoid_bce_probe_02`. `_probe_id_for` memakai `^([a-z]\d+)_`, jadi ketiga
+    # domain mewarisi satu konvensi.
+    return _probe_id_for(node_id, count + 1)
 
 
 def _read_or_empty(path: Path) -> str:

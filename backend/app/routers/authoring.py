@@ -70,6 +70,17 @@ class TriggerR4In(BaseModel):
     variant_label: str | None = None
 
 
+class TriggerNodeIn(BaseModel):
+    """L4 — lahirkan node baru dari satu entri peta Library."""
+
+    library_file: str
+    slug: str
+    domain_id: str
+    concept: str
+    source_ref_id: str
+    prereq_node_id: str | None = None
+
+
 class TriggerR2In(BaseModel):
     repo_path: str
     node_ids: list[str] | None = None
@@ -160,6 +171,32 @@ def trigger_r4(
     _require_enabled()
     try:
         job = jobs.trigger_r4(session, node_id=body.node_id, variant_label=body.variant_label)
+    except jobs.JobError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    tasks.add_task(_run_job_in_background, job.id)
+    return JobOut.of(job)
+
+
+@router.post("/node", response_model=JobOut, status_code=202)
+def trigger_node(
+    body: TriggerNodeIn, tasks: BackgroundTasks, session: Session = Depends(get_session)
+) -> JobOut:
+    """L4 — satu entri peta Library → satu node Forge, lewat R4 mode `node`.
+
+    Tunduk pada kill switch yang sama (`_require_enabled`): L4 mati bersama integrasi
+    lainnya, sesuai PRD §10 (akselerator, bukan fondasi).
+    """
+    _require_enabled()
+    try:
+        job = jobs.trigger_r4_node(
+            session,
+            library_file=body.library_file,
+            slug=body.slug,
+            domain_id=body.domain_id,
+            concept=body.concept,
+            source_ref_id=body.source_ref_id,
+            prereq_node_id=body.prereq_node_id,
+        )
     except jobs.JobError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     tasks.add_task(_run_job_in_background, job.id)

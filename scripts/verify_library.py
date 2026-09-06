@@ -6,6 +6,9 @@ Dua mode:
                     exit 0 bersih / 1 ada pelanggaran.
   --capture <file>  validasi SATU file lalu flip status outline→captured BILA body
                     sudah berisi (bukan stub). exit 0 sukses / 1 ditolak.
+  --link F --node N isi `node_ids` satu berkas materi (L4). exit 0 sukses / 1 ditolak.
+  --candidates      laporan kandidat node di peta yang belum tertempa (L4).
+                    LAPORAN, bukan gerbang — selalu exit 0.
 
 Registry (sumber kebenaran untuk ⊆):
   - source ids ← data/sources.yaml  (source_refs ⊆ ini)
@@ -247,6 +250,93 @@ def capture(path: Path, source_ids: set[str], node_ids: set[str]) -> list[str]:
     return []
 
 
+# ---------- L4: jembatan Library -> Forge ----------
+
+#: Penanda yang dipancarkan `library_scaffold.module_index_roadmap_md` (L3).
+_CANDIDATE_RE = re.compile(r"^\*\*Kandidat node:\*\*\s*`([a-z0-9-]+)`")
+#: Judul entri peta: `### [[<slug materi>|Judul]]`
+_ENTRY_RE = re.compile(r"^###\s*\[\[([a-z0-9-]+)\|")
+
+
+def candidates() -> list[dict]:
+    """Kandidat node dari seluruh peta + status tautannya ke Forge.
+
+    LAPORAN, bukan gerbang — ia pintu masuk alur `forge-node`, jadi ia selalu exit 0.
+    (Preseden: `edge_evidence.corroboration()` melaporkan tanpa memblokir, §7 2026-09-01.)
+
+    Pasangan (entri peta -> berkas materi) diambil dari struktur yang DIPANCARKAN
+    scaffolder L3, bukan ditebak: entri `### [[slug|…]]` lalu barisnya sendiri.
+    """
+    out: list[dict] = []
+    for path in _iter_library_files():
+        fm, body = split_frontmatter(path.read_text("utf-8"))
+        if not isinstance(fm, dict) or fm.get("type") != "roadmap":
+            continue
+        materi = ""
+        for raw in body.splitlines():
+            line = raw.strip()
+            entry = _ENTRY_RE.match(line)
+            if entry:
+                materi = entry.group(1)
+                continue
+            cand = _CANDIDATE_RE.match(line)
+            if cand and materi:
+                target = path.parent / f"{materi}.md"
+                t_fm: dict = {}
+                if target.is_file():
+                    parsed, _ = split_frontmatter(target.read_text("utf-8"))
+                    t_fm = parsed if isinstance(parsed, dict) else {}
+                out.append(
+                    {
+                        "peta": path.relative_to(_REPO_ROOT).as_posix(),
+                        "materi": target.relative_to(_REPO_ROOT).as_posix(),
+                        "kandidat": cand.group(1),
+                        "source_refs": list(t_fm.get("source_refs") or []),
+                        "node_ids": list(t_fm.get("node_ids") or []),
+                        "ada": target.is_file(),
+                    }
+                )
+    return out
+
+
+def link_node(
+    path: Path, source_ids: set[str], node_ids: set[str], node_id: str
+) -> list[str]:
+    """Isi `node_ids` satu berkas materi. Kembalikan alasan tolak ([] = sukses).
+
+    Ditulis SCRIPT, bukan AI — pola yang sama dengan flip status L2 dan snapshot L3:
+    bagian yang menentukan dikeluarkan dari tangan AI. Di sini yang menentukan adalah
+    klaim "materi ini sudah punya node": kalau AI boleh mengetiknya, dashboard L5
+    ("% direproduksi") bisa digerakkan tanpa satu baris kode pun dieksekusi — dan itu
+    persis illusion of competence yang produk ini dibangun untuk melawan.
+
+    `status` TIDAK disentuh: ia status CATATAN (L0), dan status reproduksi hanya boleh
+    datang dari eksekusi kode (§1.2).
+    """
+    if not path.is_file():
+        return ["file tak ditemukan"]
+    fm, body = split_frontmatter(path.read_text("utf-8"))
+    if fm is None:
+        return ["frontmatter tak terbaca"]
+    if node_id not in node_ids:
+        return [
+            f"node {node_id!r} tak ada di data/ — hanya node yang benar-benar lahir & "
+            "termuat boleh ditautkan"
+        ]
+    current = fm.get("node_ids")
+    if not isinstance(current, list):
+        return ["node_ids harus list"]
+    if node_id in current:
+        return []  # idempoten: menjalankan ulang bukan error
+    fm["node_ids"] = [*current, node_id]
+    errs = _field_errors(fm, path, source_ids, node_ids)
+    if errs:
+        return errs
+    dumped = yaml.safe_dump(fm, sort_keys=False, allow_unicode=True).strip()
+    path.write_text(f"---\n{dumped}\n---{body}", encoding="utf-8")
+    return []
+
+
 # ---------- CLI ----------
 
 def _iter_library_files() -> list[Path]:
@@ -261,13 +351,55 @@ def _iter_library_files() -> list[Path]:
 
 def main(argv: list[str]) -> int:
     force_utf8_stdio()
-    ap = argparse.ArgumentParser(description="Validator + capture lajur Library (L2).")
+    ap = argparse.ArgumentParser(
+        description="Validator + capture lajur Library (L2) + jembatan Forge (L4).")
     ap.add_argument("--capture", type=Path, metavar="FILE",
                     help="flip satu file outline→captured bila body berisi")
+    ap.add_argument("--link", type=Path, metavar="FILE",
+                    help="isi node_ids satu berkas materi (butuh --node)")
+    ap.add_argument("--node", metavar="NODE_ID",
+                    help="node id yang ditautkan oleh --link")
+    ap.add_argument("--candidates", action="store_true",
+                    help="laporkan kandidat node di peta yang belum tertempa")
     args = ap.parse_args(argv)
+
+    if bool(args.link) != bool(args.node):
+        print("--link dan --node harus berpasangan", file=sys.stderr)
+        return 2
 
     source_ids = load_source_ids()
     node_ids = load_node_ids()
+
+    if args.candidates:
+        # LAPORAN, bukan gerbang — selalu exit 0.
+        rows = candidates()
+        belum = [r for r in rows if not r["node_ids"]]
+        sudah = [r for r in rows if r["node_ids"]]
+        print(f"kandidat belum tertempa: {len(belum)}")
+        for r in belum:
+            hilang = "" if r["ada"] else "  [BERKAS MATERI TAK ADA]"
+            print(f"  - {r['materi']}{hilang}")
+            print(f"      kandidat: {r['kandidat']} · sumber: "
+                  f"{', '.join(r['source_refs']) or '(tak ada)'}")
+        print(f"sudah tertaut: {len(sudah)}")
+        for r in sudah:
+            print(f"  = {r['materi']} → {', '.join(r['node_ids'])}")
+        return 0
+
+    if args.link is not None:
+        path = args.link.resolve()
+        reasons = link_node(path, source_ids, node_ids, args.node)
+        try:
+            rel = path.relative_to(_REPO_ROOT).as_posix()
+        except ValueError:
+            rel = str(path)
+        if reasons:
+            print(f"LINK DITOLAK: {rel}", file=sys.stderr)
+            for r in reasons:
+                print(f"  - {r}", file=sys.stderr)
+            return 1
+        print(f"tertaut: {rel} → {args.node}")
+        return 0
 
     if args.capture is not None:
         path = args.capture.resolve()

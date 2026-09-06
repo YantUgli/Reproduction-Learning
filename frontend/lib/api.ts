@@ -240,6 +240,48 @@ export interface Explanation {
   worked_example: string;
 }
 
+// --- L5: lajur Library ("% direproduksi", bukan "% dibaca") ---
+export type MaterialState = "unmapped" | "mapped_unproven" | "reproduced";
+
+export interface LibraryMaterial {
+  path: string;
+  title: string;
+  type: string;
+  /** Status CATATAN (outline/captured) - label, BUKAN kemajuan. Jangan diakumulasi. */
+  note_status: string;
+  node_ids: string[];
+  missing_node_ids: string[];
+  state: MaterialState;
+  mastered: boolean;
+  decayed: boolean;
+}
+
+export interface LibraryModule {
+  module: string;
+  title: string;
+  materials: LibraryMaterial[];
+}
+
+export interface LibraryCourse {
+  course: string;
+  title: string;
+  total: number;
+  unmapped: number;
+  mapped_unproven: number;
+  reproduced: number;
+  mastered: number;
+  decayed: number;
+  reproduced_pct: number | null;
+  modules: LibraryModule[];
+}
+
+export interface LibraryProgress {
+  total: number;
+  reproduced: number;
+  reproduced_pct: number | null;
+  courses: LibraryCourse[];
+}
+
 async function j<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.text();
@@ -312,6 +354,10 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then(j<PlacementSubmitOut>),
+
+  // --- L5: lajur Library. READ-ONLY; penulis `library/` tetap scripts/ (L1-L4). ---
+  getLibraryProgress: () =>
+    fetch(`${BACKEND_URL}/library/progress`).then(j<LibraryProgress>),
 
   // --- M5 ---
   // Materi just-in-time: backend menolak (403) selama node belum punya attempt gagal.

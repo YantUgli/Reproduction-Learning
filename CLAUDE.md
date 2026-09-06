@@ -148,9 +148,17 @@ python scripts/fetch_source.py --id fastapi_docs_first_steps
 python scripts/fetch_source.py --all              # semua sumber ber-URL yang belum ada
 python scripts/fetch_source.py --id buku_bab3 --from-file bab3.txt   # sumber non-URL
 
-# Lajur Library (L1–L3) — scaffolder (gerbang TULIS) & validator (gerbang BACA)
+# Lajur Library (L1–L4) — scaffolder (gerbang TULIS) & validator (gerbang BACA)
 python scripts/library_scaffold.py --spec <spec.yaml> [--dry-run]
 python scripts/verify_library.py                  # atau: ... --capture <file>
+
+# Jembatan Library→Forge (L4). `--candidates` LAPORAN (selalu exit 0), bukan gerbang.
+# `--link` satu-satunya jalur menulis `node_ids` — AI tak pernah mengetiknya sendiri.
+python scripts/verify_library.py --candidates
+python scripts/verify_library.py --link <materi.md> --node <node_id>
+
+# Progres lajur Library (L5) — "% direproduksi", bukan "% dibaca". READ-ONLY.
+curl -s localhost:8000/library/progress
 
 # Runtime grading React (M6) — sekali saja, sebelum node React bisa dinilai
 cd runtime/react && npm install
@@ -163,6 +171,9 @@ Halaman frontend (M4): `/` dashboard + KPI · `/node/[id]` sesi akuisisi L3→L0
 `/placement` menemukan lantai · `/review` sesi review jatuh tempo.
 Halaman M5: `/authoring` meja audit — node/edge tertandai telemetri + tombol pensiun
 (dulu antrean approve blokir; §7 2026-08-31).
+Halaman L5: `/library` peta lajur Library — **% direproduksi, bukan % dibaca**
+(`GET /library/progress`; backend MEMBACA `library/`, tak pernah menulisnya).
+Dashboard hanya kebagian satu kartu KPI + tautan; daftar course tinggal di `/library`.
 
 ```bash
 # Integrasi Claude Code (M5) — semuanya opsional bagi loop inti.
@@ -170,7 +181,7 @@ CLAUDE_INTEGRATION_ENABLED=0 uvicorn app.main:app --reload   # kill switch: trig
 CLAUDE_AUTO_PROMOTE=0 uvicorn app.main:app --reload          # M7: artifact berhenti di `ready`
 ```
 
-Alur satu artifact (M5, diubah M7): `POST /authoring/{r2,r3,r4}` (balas `202`, job `pending`) →
+Alur satu artifact (M5, diubah M7, ditambah L4): `POST /authoring/{r2,r3,r4,node}` (balas `202`, job `pending`) →
 Claude Code jalan di latar & menulis ke `artifacts/<role>/<stamp>/` → skema
 (`contracts.py`) → gerbang mesin (triad eksekusi R4, probe DIJALANKAN, kutipan verbatim
 R3) → `ready` → **promosi otomatis** ke `data/`/DB. Tanpa lolos gerbang mesin, tak ada yang
@@ -178,6 +189,12 @@ masuk sistem. Peninjauan manusia pindah ke belakang: `GET /authoring/audit` mela
 tertandai telemetri + edge yang belum terkukuhkan (halaman frontend-nya belum ada).
 `CLAUDE_AUTO_PROMOTE=0` mengembalikan alur lama (berhenti di `ready`, menunggu approve).
 `artifacts/` git-ignored; yang di-commit adalah hasil promosinya di `data/`.
+
+**`POST /authoring/node` (L4)** = R4 mode `node`: satu entri peta Library → satu NODE BARU
+utuh (`node.yaml` + 2 varian + 1 probe). Gerbangnya triad **per varian** + probe dieksekusi
++ kutipan verbatim; identitas node (id, grader, label, probe id) ditetapkan server, bukan
+model. Edge yang lahir selalu `soft`. Tautan balik `node_ids` ditulis
+`scripts/verify_library.py --link`, bukan backend — dua lajur, dua penulis.
 
 ---
 
@@ -709,3 +726,169 @@ alasan · alternatif yang ditolak.
   alih-alih meng-import-nya dari `grounding.py`; (v) `nodes.proposed.yaml` di L3 (pipa
   tanpa konsumen); (vi) memperluas aturan roadmap ke file `note` (kutipan di catatan
   Bryant adalah tulisannya sendiri, bukan klaim generate).
+
+- **2026-09-06 · L4 · Jembatan Library→Forge: node LAHIR lewat R4 mode `node`, bukan
+  peran R5 — dan pipeline M5 ternyata memang tak bisa melahirkan node.** Roadmap L4
+  menulis "pakai pipeline authoring yang sudah ada (R4), jangan bikin jalur baru".
+  Dibaca di kode, pipeline itu **tak punya jalur kelahiran node sama sekali**:
+  `trigger_r4` menolak node tanpa instance (ia mencontoh `instances[0]`), `_promote_r4`
+  hanya menulis VARIAN ke folder node yang sudah ada, dan R1 (pembuat node) tak pernah
+  dibangun — `Role` cuma r2/r3/r4. Keputusan: **perluas R4 dengan mode `node`**
+  (`job.request["mode"] ∈ {variant, node}`), bukan menambah peran. Alasan: gerbangnya
+  sama (`run_triad` + `verify_probe`), promosinya sekeluarga, dan peran baru berarti
+  endpoint+prompt+kontrak+gate+status baru yang harus dirawat selamanya.
+
+  **Yang menjaga jalur ini** (semuanya mesin, tak ada approve manusia — sejalan §7
+  2026-08-31):
+  (a) **Node lahir LENGKAP atau tidak lahir sama sekali.** Satu artifact = `node.yaml`
+  + **2 varian** + **1 probe** + `citation.json`. Node setengah jadi bukan cuma jelek:
+  `assemble_node` menolak node < 2 varian dan `load_nodes.py` memuat per-DOMAIN, jadi
+  satu folder cacat mematikan SELURUH domain.
+  (b) **Gerbang = triad DUA KALI + probe dieksekusi.** Tiap varian lewat `run_triad`
+  (referensi HIJAU, kosong MERAH, starter MERAH). Node baru tak boleh masuk dengan
+  standar lebih longgar daripada varian tambahan (M7) atau node tulisan tangan
+  (`verify_nodes.py`) — ketiganya memanggil fungsi yang sama. Biayanya ~2× waktu gate.
+  (c) **Identitas node ditentukan MESIN.** `node_id`, label varian, `probe_id`,
+  `domain_id`, `grader_type`, ekstensi berkas dihitung `trigger_r4_node()` dari isi
+  `data/` lalu DIPAKSAKAN ke artifact (`contracts._require_identity`). Yang boleh
+  dikarang model hanyalah ISI. Penamaan yang dikarang model adalah cara termurah membuat
+  kurikulum berantakan tanpa satu pun gerbang berbunyi; `grader_type` yang dikarang
+  adalah cara memilih gerbang yang paling mudah dilewati.
+  (d) **`grader_type` diwarisi dari node contoh di domain yang sama**, bukan dari tabel
+  domain→grader baru. Konsekuensi yang diterima: domain tanpa satu pun node **tak bisa**
+  jadi target L4 — sekaligus alasan mengapa "domain baru" (= grader baru, pekerjaan gaya
+  M6) di luar ruang lingkup.
+  (e) **Sumber wajib TER-SNAPSHOT dan satu sumber dengan materinya.** `source_ref_id`
+  wajib ada di `sources.yaml`, punya `data/sources/<id>.md` (L3), DAN muncul di
+  `source_refs` berkas materi Library asalnya — itu yang membuat jembatannya bukan
+  sekadar nama berkas yang kebetulan mirip. Ditambah kutipan verbatim lewat
+  `grounding.check_quotes`.
+  (f) **Kutipan diverifikasi lalu TIDAK disimpan ke `data/`.** `node.yaml` memakai
+  `extra="forbid"` dan formatnya dipakai seluruh kurikulum; menambah field `quote`
+  berarti mengubah skema semua node demi satu jalur. Kutipannya hidup di
+  `artifacts/<job>/citation.json` + ringkasan job. Yang dijaga bukan arsipnya,
+  melainkan gerbangnya.
+  (g) **Edge hasil L4 selalu `soft` dan opsional** (§7 2026-09-01). Konsekuensi yang
+  diterima sadar: node hasil L4 **selalu langsung `available`** — ia tak pernah mengunci
+  apa pun dan tak pernah terkunci.
+  (h) **`edges.yaml` ditambahi APPEND TEKS, bukan `yaml.dump` ulang.** Berkas itu penuh
+  komentar kurasi ("difinalkan Isyah 2026-08-22 …") dan dumper akan menghapusnya
+  diam-diam. Append + `load_edges()` sebagai bukti masih parse + rollback dari salinan
+  mentah.
+  (i) **Backend tak pernah menyentuh `library/`.** Promosi menulis `data/` + DB; tautan
+  balik `node_ids` ditulis `scripts/verify_library.py --link`. Dua lajur, dua penulis —
+  dan lajur Library tetap bisa dipakai tanpa backend menyala.
+  (j) **Tautan balik ditulis SCRIPT, bukan AI.** Pola yang sama dengan flip status L2 dan
+  snapshot L3. Kalau AI boleh mengetik `node_ids`, angka "% direproduksi" (L5) bisa naik
+  tanpa satu baris kode pun dieksekusi — persis illusion of competence yang produk ini
+  dibangun untuk melawan. `--link` menolak node yang tak ada di `data/`, idempoten, dan
+  **tak menyentuh `status`** (itu status CATATAN, bukan reproduksi).
+
+  **Batas yang diterima sadar:** (1) **Relevansi entri peta terhadap tujuan tetap tanpa
+  oracle.** Gerbang membuktikan node itu *bisa direproduksi & dinilai*, bukan bahwa ia
+  *layak dipelajari*. Penjaganya sama seperti M7: telemetri menandai node curiga,
+  pencabutan tetap satu klik manusia. (2) Kutipan membuktikan kutipannya nyata, bukan
+  bahwa ia menopang konsep node — kalimat yang sama sudah tertulis di `grounding.py`.
+  (3) **n=1 tetap n=1.** L4 menambah LAJU pembuatan node; ia tak menambah bukti bahwa
+  node itu baik. Karena itu L5 (penjaga metrik) naik prioritas justru setelah L4 hidup.
+
+  **Ikut diperbaiki (dengan bukti dari kurikulum):** `_next_probe_id()` memakai regex
+  `^(n\d+)` — hanya cocok untuk id domain FastAPI. Buktinya sudah ada: probe ML tulisan
+  tangan bernama `m001_probe_01`, sedangkan probe buatan AI di node yang sama jatuh ke
+  fallback "nama node penuh" dan jadi `m002_sigmoid_bce_probe_02`. Sekarang keduanya
+  lewat `_probe_id_for()` (`^([a-z]\d+)_`), jadi ketiga domain mewarisi satu konvensi.
+  Aturan bentuk hidden test juga diekstrak jadi `contracts.check_test_references_solution`
+  supaya R4 varian & R4 node memakai SATU salinan (preseden `run_triad`).
+
+
+  **Ditemukan smoke sungguhan (dan itu gunanya smoke):** `r4_node.md` versi rencana hanya
+  menulis "`probe.yaml` wajib punya `snippet` dan `expression`" — ia **tak pernah
+  mendaftar skema `ProbeYaml` utuh**, sementara prompt R4 varian (`r4_challenge.md`)
+  sudah mendaftarnya sejak M5. Dua panggilan CLI berturut-turut menghasilkan probe tanpa
+  `node_id` dan `type`; log hasil model menyebutkan sendiri bahwa ia mengikuti nama field
+  "dari instruksi peran, tanpa bisa mengecek `contracts.py`". Kontrak menolak keduanya dan
+  **nol berkas menyentuh `data/`** — jadi yang gagal adalah promptnya, bukan gerbangnya.
+  Skema probe kini didaftar lengkap di `r4_node.md`. Catatan yang ikut terlihat: retry
+  `execute_job` memakai prompt yang IDENTIK, jadi celah prompt yang sistematis memakan dua
+  panggilan CLI penuh sebelum menyerah. Itu perilaku M5 yang sudah ada, bukan bawaan L4 —
+  tak diubah di sini, tapi layak dicatat sebagai biaya yang diketahui.
+
+  *Ditolak:* (i) peran R5 node-genesis (permukaan kode terbesar untuk gerbang yang sama
+  persis); (ii) node "setengah jadi" yang dilengkapi belakangan (memecahkan seluruh
+  domain, bukan cuma dirinya); (iii) edge `hard` dari usul AI (§7 2026-09-01: yang salah
+  mengunci Bryant keluar dari node yang siap ia kerjakan); (iv) menyimpan `quote` di
+  `node.yaml` (mengubah skema seluruh kurikulum demi satu jalur); (v) tabel domain→grader
+  baru (knowledge baru yang harus dijaga, sementara node contoh sudah membuktikannya);
+  (vi) membiarkan AI mengetik `node_ids` (menggerakkan metrik L5 tanpa eksekusi).
+
+- **2026-09-06 · L5 · Penjaga metrik lajur Library: "% direproduksi", bukan "% dibaca".
+  Angka progres Library dihitung dari DB Forge (join `node_ids` → `Attempt`), TIDAK
+  PERNAH disimpan di frontmatter.** L5 menutup lajur Library dengan satu-satunya fase
+  yang roadmap sebut wajib ada sebelum sistem boleh disebut selesai. Ia bukan fitur
+  pelaporan: bahayanya yang dijaga bukan satu invariant jebol, melainkan Bryant
+  menghabiskan waktunya di **Library yang nyaman** sementara **Forge yang tak nyaman**
+  terbengkalai. Begitu progres Library bisa naik karena MEMBACA, seluruh lajur ini
+  berubah jadi consumption comfort yang §8 tolak.
+
+  **Aturan yang dikunci** (semuanya di `services/library_progress.py`, semuanya diuji di
+  `backend/tests/test_library_progress.py`):
+  (a) **"Direproduksi" = pernah lolos attempt mode DINGIN** (`kpi.REPRODUCE_MODES` =
+  verification/review/placement, `result == "pass"`), dan definisinya **di-import** dari
+  `services/kpi.py`, bukan disalin — dua definisi "reproduce-without-AI" akan menyimpang,
+  dan yang lebih longgar yang akan dipakai. Mode `acquisition` (scaffold masih di layar)
+  tak pernah dihitung.
+  (b) **Tiga keadaan per materi, bukan satu angka:** `unmapped` (belum punya `node_ids`) ·
+  `mapped_unproven` · `reproduced`. "Belum ditempa" dan "sudah ditempa tapi belum kamu
+  buktikan" adalah dua utang berbeda yang butuh tindakan berbeda; satu angka tunggal
+  menyembunyikan bedanya.
+  (c) **`lapsed` tetap dihitung terbukti, tapi ditandai meluruh** (§7 2026-08-21 Q3: yang
+  meluruh memorinya, bukan buktinya). Menghapusnya dari angka membuat satu review buruk
+  terlihat seperti kemunduran kurikulum.
+  (d) **Materi tanpa `node_ids` tetap masuk PENYEBUT** — inilah properti "berlubang" yang
+  diminta roadmap. Mengeluarkannya akan membuat course dengan satu materi tertempa tampil
+  100%.
+  (e) **Penyebut hanya `type ∈ {note, transcription}`.** `outline`/`roadmap` adalah berkas
+  struktural; memasukkannya menghukum course hanya karena ia punya banyak modul.
+  (f) **Materi ber-banyak-node butuh SEMUANYA terbukti.** Ambang "salah satu saja" memberi
+  hadiah untuk memetakan banyak node lalu membuktikan yang termudah.
+  (g) **Backend MEMBACA `library/`, tak pernah menulis.** L4 KUNCI 10 melarang backend
+  *menyentuh*; L5 memperjelas batasnya. Diuji lewat perbandingan byte + mtime
+  (`test_membaca_tidak_pernah_menulis`), bukan lewat janji.
+  (h) **`status` frontmatter (`outline`/`captured`) TIDAK PERNAH masuk hitungan** — ia
+  status CATATAN (§7 2026-09-04), bukan status reproduksi. Boleh tampil sebagai label
+  netral, tak pernah sebagai persentase atau progress bar. Diuji: mengubah SELURUH materi
+  jadi `captured` wajib menghasilkan angka identik. Ia dinamai ulang jadi `note_status` di
+  API supaya tak ada di sisi frontend yang tergoda mengakumulasinya. Penjaga yang tak
+  diuji adalah penjaga yang akan luntur.
+  (i) **`node_ids` menggantung dilaporkan dan dihitung BELUM terbukti** — node yang tak ada
+  di DB tak bisa dibuktikan, dan kesalahan tautan tak boleh tampak seperti kemajuan.
+  (j) **`/library` terpisah dari dashboard**; dashboard cuma dapat satu kartu + tautan.
+  Menjejalkan daftar course ke dashboard membuat lajur Library terasa jadi lajur utama —
+  padahal Forge yang harus terasa utama.
+  (k) **Pembulatan tak boleh berbohong ke atas:** selama `reproduced < total`, angkanya
+  dibatasi 99% (dan tak pernah 0% selama ada yang terbukti); `x/y` selalu tampil di
+  sebelahnya. `Math.round(0.996) = 100%` adalah kenyamanan palsu yang persis dilawan lajur
+  ini.
+
+  **Batas yang diterima sadar:** (1) **metrik ini mengukur cakupan pembuktian, bukan
+  kualitas kurikulum** — course bisa 100% direproduksi dan tetap mengajarkan hal yang
+  salah; yang menjaga itu telemetri M7 + pencabutan manual, bukan L5. (2) Pemetaan
+  materi→node ditulis script (`--link`, L4 KUNCI 11); L5 mempercayai tautan itu dan hanya
+  memeriksa bahwa node-nya ada dan terbukti. (3) **n=1 tetap n=1** — persentase dari satu
+  pelajar adalah catatan perjalanan, bukan statistik.
+
+  **Efek samping yang disengaja:** acceptance L4 yang belum tuntas (belum ada node yang
+  benar-benar lahir dari peta generate — tertahan `HTTP 429`, bukan gerbang) sekarang
+  **terlihat** sebagai `fastapi-produksi` 0% berlubang, bukan sebagai course yang tampak
+  baik-baik saja.
+
+  *Ditolak:* (i) menyimpan status reproduksi di frontmatter (`forged`) — dua sumber
+  kebenaran, dan status reproduksi hanya boleh datang dari eksekusi kode (§1.2); (ii)
+  script penghasil berkas indeks yang di-commit (sumber kebenaran kedua yang bisa basi —
+  pola yang sudah dua kali ditolak: job state di file vs DB, toleransi ML di `data/` vs
+  kolom DB); (iii) memasukkan `status` catatan ke hitungan "kecil-kecilan" (mis. mengurutkan
+  course dari berapa yang sudah `captured` — urutan pun pesan tentang apa yang dihargai);
+  (iv) berkas cacat → 500 (dashboard yang mati gara-gara satu berkas setengah tersunting
+  akan membuat Bryant berhenti memakainya; yang bertugas meneriakkannya
+  `scripts/verify_library.py`, gerbang commit); (v) grafik tren/streak/lencana — semuanya
+  membuat angka terasa enak tanpa menambah satu pun bukti reproduksi.

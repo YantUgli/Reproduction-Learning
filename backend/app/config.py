@@ -20,6 +20,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # Direktori data node/edge/domain (YAML, di-commit ke git).
 DATA_DIR = REPO_ROOT / "data"
 
+# --------------------------------------------------------------------------- #
+# Lajur Library (L0-L5). Backend MEMBACA folder ini untuk menghitung
+# "% direproduksi" (L5) dan TAK PERNAH menulisnya: penulisnya `scripts/` (L1-L3)
+# dan `verify_library.py --link` (L4). Satu alamat, supaya tak ada modul yang
+# menyusun path-nya sendiri.
+# --------------------------------------------------------------------------- #
+LIBRARY_DIR = REPO_ROOT / "library"
+
 # Database SQLite single-user, local-first.
 # Path ABSOLUT (anchored di backend/app.db) supaya stabil apa pun cwd: uvicorn
 # (dari backend/) & scripts/*.py (dari repo root) menunjuk DB yang sama.

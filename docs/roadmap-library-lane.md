@@ -61,7 +61,7 @@ Diturunkan dari CLAUDE.md §1–§2 + dua penjaga brainstorm:
 | **L2** | `note-refine` | tidak (AI = editor) | nol mastery | L1 |
 | **L3** | `learn-intake` + grounding ✅ | **ya** | §8 (content library) | L2 |
 | **L4** | Jembatan Library→Forge | ya (usul node) | pakai gate M5/M7 | L3 |
-| **L5** | Penjaga metrik (dashboard) | — | **wajib sebelum "selesai"** | L4 |
+| **L5** | Penjaga metrik (dashboard) ✅ | — | **wajib sebelum "selesai"** | L4 |
 
 **Urutan tidak boleh dibalik.** Tiap fase memasang penjaga sebelum fase berikutnya
 menambah risiko.
@@ -138,13 +138,61 @@ menambah risiko.
 - Usulan node dari L3 masuk **pipeline authoring yang sudah ada** (R4 → gate mesin
   M5/M7). Tidak bikin jalur baru.
 - Link dua arah: materi ⇄ `node_ids`.
+- **Koreksi 2026-09-06 (dari pembacaan kode, bukan asumsi):** pipeline yang ada **tak
+  bisa melahirkan node** — `trigger_r4` menolak node tanpa instance dan `_promote_r4`
+  hanya menulis varian ke node yang sudah ada; R1 tak pernah dibangun. Keputusan Isyah:
+  **perluas R4 dengan mode `node`** (artifact = `node.yaml` + 2 varian + 1 probe),
+  bukan bikin peran R5. Gerbangnya mendaur ulang yang sudah terbukti: `run_triad`
+  dijalankan **per varian** + probe dieksekusi + sitasi verbatim (L3).
+- **Plan eksekusi lengkap:** [`execution-plan-L4-library-forge-bridge.md`](execution-plan-L4-library-forge-bridge.md)
+  (11 keputusan terkunci, kode acuan, test, urutan build gerbang-dulu, smoke, DoD).
 - **Acceptance:** dari 1 materi Library lahir 1 node Forge terverifikasi hijau.
+- ✅ **Terkirim (2026-09-06):** `NodeGenesisArtifact` + `load_node_genesis` +
+  `_require_identity` (contracts) · `trigger_r4_node` + `_gate_r4_node` (jobs) ·
+  `r4_node.md` (`r4node-v1`) · `_promote_node_genesis` + `_append_soft_edge`
+  (review_queue) · `POST /authoring/node` · `verify_library.py --link/--candidates` ·
+  skill `forge-node`. Aturan bentuk hidden test diekstrak jadi SATU salinan
+  (`check_test_references_solution`) yang dipakai R4 varian & R4 node.
+- **Test:** 185 backend hijau (naik dari 151 — +24 `test_node_genesis`, +9
+  `test_promote_node` yang merupakan **test promosi pertama di repo**) dan 62 scripts
+  hijau (+9 untuk `--link`/`--candidates`).
+- ⏳ **Acceptance BELUM terpenuhi penuh:** seluruh uji penolakan, kill switch, dan jalur
+  L3→L4 terbukti live, tapi **belum ada node sungguhan yang lahir** — panggilan CLI
+  ketiga dibalas `HTTP 429` (kuota sesi habis), bukan ditolak gerbang. Selama tiga job
+  smoke, `git status data/` tetap bersih. Cara menuntaskannya (tanpa perubahan kode) ada
+  di [`execution-plan-L4-library-forge-bridge.md`](execution-plan-L4-library-forge-bridge.md) §15.
+- **Ditemukan smoke:** `r4_node.md` tak mendaftar skema `ProbeYaml` utuh, jadi dua
+  artifact lahir tanpa `node_id`/`type` dan **ditolak kontrak** — promptnya yang cacat,
+  bukan gerbangnya. Sudah diperbaiki.
 
 ### L5 — Penjaga metrik (kunci anti-"Dicoding jilid 2")
 - Dashboard hitung **"% direproduksi", bukan "% dibaca"**. Course tampil *belum
-  selesai* sampai `node_ids`-nya `forged`.
+  selesai* sampai `node_ids`-nya terbukti.
+- **Metrik dikunci 2026-09-06:** "direproduksi" = **pernah lolos attempt mode dingin**
+  (`kpi.REPRODUCE_MODES`, di-import bukan disalin) — bukan "node ada", bukan status.
+  Tiga keadaan per materi (belum tertempa · tertempa belum dibuktikan · direproduksi)
+  + penanda `mastered`/`meluruh`. Materi tanpa `node_ids` **tetap masuk penyebut**
+  (itu lubangnya), `_index` struktural tidak. `status` frontmatter (`outline`/`captured`)
+  **tak pernah** masuk hitungan — dan itu **diuji**.
+- **Arsitektur:** backend **MEMBACA** `library/` (`services/library_progress.py`,
+  read-only) + `GET /library/progress` + halaman `/library`; dashboard cuma dapat satu
+  kartu. Penulisnya tetap `scripts/` (L1–L3) & promosi L4 — tak ada berkas indeks
+  yang di-commit (sumber kebenaran kedua).
+- **Plan eksekusi lengkap:** [`execution-plan-L5-metric-guard.md`](execution-plan-L5-metric-guard.md)
+  (10 keputusan terkunci, kode acuan terbukti-jalan, test anti-gaming, smoke, DoD).
 - **Acceptance:** KPI baru muncul; membaca materi **tidak** menggerakkan progres.
 - Dibangun terakhir, tapi **wajib ada sebelum sistem boleh disebut selesai**.
+- ✅ **SELESAI 2026-09-06.** Terpasang: `config.LIBRARY_DIR`,
+  `services/library_progress.py` (read-only), `GET /library/progress`, halaman
+  `/library`, satu kartu KPI + tautan di dashboard. Bukti: **16 test baru**
+  (`backend/tests/test_library_progress.py`) termasuk dua penjaga —
+  `test_status_captured_tidak_menggerakkan_angka` (mengubah SELURUH materi jadi
+  `captured` → angka identik) dan `test_membaca_tidak_pernah_menulis` (byte + mtime
+  seluruh berkas tak berubah sesudah `compute`). Atas `library/` & DB nyata: **5 materi,
+  0 direproduksi** — `fastapi-dasar` 4 `mapped_unproven` (node n002–n005 ada, DB Bryant
+  belum punya satu pun attempt), `fastapi-produksi` **1 `unmapped` = lubang yang
+  terlihat** (buah acceptance L4 yang belum tuntas). Catatan entri §7 CLAUDE.md
+  2026-09-06 (L5).
 
 ---
 
@@ -153,7 +201,9 @@ menambah risiko.
 - **L0→L1→L2** aman total (nol mastery) — jalan cepat, membuktikan lajur Library nyata.
 - **L3** titik masuk risiko §8 → di sinilah grounding wajib mengikat.
 - **L5** tak boleh ditunda tanpa batas: tiap minggu L1–L4 hidup tanpa L5, Bryant
-  berlatih mengukur "dibaca". Kalau berhenti di tengah, berhenti **setelah** L5.
+  berlatih mengukur "dibaca". Kalau berhenti di tengah, berhenti **setelah** L5. ✅
+  **Peringatan ini berhenti berlaku 2026-09-06:** L5 hijau, jadi kenyamanan tak bisa lagi
+  menyamar jadi kemajuan.
 
 ---
 
@@ -186,6 +236,25 @@ menambah risiko.
   `type: roadmap`, dan batas "peta vs bab" dibuat mekanis (dilarang blok kode + batas
   prosa 3000 karakter). Urutan build: **gerbang dulu, penulisnya belakangan** — diikuti
   apa adanya saat eksekusi.
-- ▶️ **Berikutnya: L4 (jembatan Library→Forge)**, lalu L5 (penjaga metrik). Peringatan §4
-  berlaku makin keras sekarang: L3 membuat peta terasa seperti kurikulum, jadi tekanan
-  untuk menyegerakan L5 ("% direproduksi, bukan % dibaca") naik justru setelah fase ini.
+- ▶️ **L4 (jembatan Library→Forge) — plan eksekusi SIAP, belum dikerjakan** (2026-09-06):
+  [`execution-plan-L4-library-forge-bridge.md`](execution-plan-L4-library-forge-bridge.md).
+  Temuan yang membentuknya: pipeline R4 tak bisa melahirkan node (lihat koreksi di §3/L4);
+  Isyah memilih **memperluas R4 dengan mode `node`** ketimbang menambah peran R5. 11
+  keputusan dikunci, di antaranya: identitas node (id/label/probe/grader) ditetapkan
+  **mesin**, node lahir **lengkap atau tidak sama sekali** (≥2 varian + 1 probe), gerbang =
+  **triad per varian** + probe dieksekusi + kutipan verbatim, edge hasil AI **selalu
+  `soft`**, `edges.yaml` ditambahi lewat **append teks** (komentar kurasi tak boleh hilang),
+  dan tautan balik `node_ids` ditulis **script**, bukan AI.
+- ✅ **L5 (penjaga metrik) SELESAI** (2026-09-06) —
+  [`execution-plan-L5-metric-guard.md`](execution-plan-L5-metric-guard.md). 10 keputusan
+  dikunci; yang menentukan: "direproduksi" = pernah lolos **attempt mode dingin** (definisi
+  di-import dari `kpi.py`), tiga keadaan per materi, materi tanpa node **tetap masuk
+  penyebut**, `lapsed` tetap terbukti tapi ditandai meluruh, backend **membaca** `library/`
+  (tak pernah menulis), dan `status` catatan **tak pernah** masuk hitungan — dijaga test
+  `test_status_captured_tidak_menggerakkan_angka`. Kode acuannya sudah diprototipekan atas
+  `library/` & DB nyata: `fastapi-dasar` 4 materi, `fastapi-produksi` **1 materi berlubang**
+  (buah dari acceptance L4 yang belum tuntas — tampil sebagai lubang, bukan disembunyikan).
+  Hasil eksekusi & bukti test ada di §3/L5 di atas.
+- ⏭️ **Sesudah L5:** menuntaskan acceptance L4 (satu node sungguhan lahir) dan sisa **M7**
+  (meja audit + tombol pensiun + `destination`). Peringatan §4 berhenti berlaku begitu L5
+  hijau — sejak titik itu, kenyamanan tak bisa lagi menyamar jadi kemajuan.

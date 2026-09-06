@@ -224,7 +224,12 @@ def test_r2_unknown_node_rejected(tmp_path):
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "name,prefix",
-    [("r2_hypotheses", "r2-"), ("r3_explanation", "r3-"), ("r4_challenge", "r4-")],
+    [
+        ("r2_hypotheses", "r2-"),
+        ("r3_explanation", "r3-"),
+        ("r4_challenge", "r4-"),
+        ("r4_node", "r4node-"),
+    ],
 )
 def test_prompt_templates_are_versioned(name: str, prefix: str):
     version, body = load_template(name)

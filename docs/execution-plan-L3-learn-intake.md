@@ -1,6 +1,8 @@
 # Plan Eksekusi L3 — Skill `learn-intake` + gerbang grounding (snapshot + kutipan verbatim)
 
-> **Status:** rencana eksekusi siap-kerja. Turunan dari
+> **Status:** ✅ **DIEKSEKUSI & TERVERIFIKASI 2026-09-05** — seluruh DoD §12 terbukti
+> (commit `7a258e0` + `4e1e91f`, branch `m7-machine-gates`). Dokumen ini kini jadi
+> catatan rancangan + bukti, bukan daftar tugas. Turunan dari
 > [`roadmap-library-lane.md`](roadmap-library-lane.md) fase **L3** dan keputusan
 > [`../CLAUDE.md`](../CLAUDE.md) §7 (2026-08-31, 2026-09-01, 2026-09-04). Format target
 > dibekukan di [`../library/README.md`](../library/README.md) (L0); scaffolder yang
@@ -1366,25 +1368,63 @@ backend/.venv/Scripts/python.exe scripts/verify_library.py
 
 ---
 
-## 12. Definition of Done (checklist)
+## 12. Definition of Done (checklist) — ✅ SEMUA TERBUKTI 2026-09-05
 
-- [ ] `scripts/_console.py`, `scripts/fetch_source.py` ada; `library_scaffold.py` &
+> Dieksekusi 2026-09-05 pada commit `7a258e0` (L3) + `4e1e91f` (gotcha #1, terpisah),
+> branch `m7-machine-gates`. Kolom bukti diisi dari run nyata, bukan dari niat.
+
+- [x] `scripts/_console.py`, `scripts/fetch_source.py` ada; `library_scaffold.py` &
       `verify_library.py` diperluas sesuai §6–§7.
-- [ ] `data/sources/` berisi ≥ 2 snapshot sumber nyata, **ter-commit** (bukan di-ignore).
-- [ ] `.claude/skills/learn-intake/SKILL.md` ada, isinya sesuai §9.
-- [ ] Test hijau seluruhnya: `backend/.venv/Scripts/python.exe -m pytest scripts/ -q`
+      → gerbang TULIS `check_grounding()`, gerbang BACA `roadmap_errors()`;
+      `MIN_QUOTE_CHARS`/`normalize` **di-import** dari `app/services/grounding.py`
+      (bukan disalin — gotcha #7).
+- [x] `data/sources/` berisi ≥ 2 snapshot sumber nyata, **ter-commit** (bukan di-ignore).
+      → `fastapi_docs_first_steps.md` (17.714 karakter) &
+      `fastapi_docs_path_params.md` (15.441 karakter), keduanya `provenance: fetch`.
+- [x] `.claude/skills/learn-intake/SKILL.md` ada, isinya sesuai §9.
+- [x] Test hijau seluruhnya: `backend/.venv/Scripts/python.exe -m pytest scripts/ -q`
       (24 test lama tetap hijau + tambahan L3).
-- [ ] Test backend tak tersentuh: `cd backend && .venv/Scripts/python.exe -m pytest -q`.
-- [ ] `ruff` bersih untuk berkas L3:
+      → **53 passed** = 24 lama + 9 `test_fetch_source` + 9 validator L3 + 11
+      scaffolder L3 (termasuk regresi `test_jalur_L1_tak_berubah`).
+- [x] Test backend tak tersentuh: `cd backend && .venv/Scripts/python.exe -m pytest -q`.
+      → **151 passed, 1 warning in 429.85s**, exit 0.
+- [x] `ruff` bersih untuk berkas L3:
       `cd backend && .venv/Scripts/python.exe -m ruff check ../scripts` — tak ada temuan
       **baru** (3 temuan lama: 1×UP017 + 2×E402 di test lama; jangan campur perbaikannya
       ke commit L3).
-- [ ] Validator hijau atas seluruh `library/`.
-- [ ] Semua baris tabel smoke §11 terbukti, termasuk **dua uji penolakan**
+      → persis 3 temuan, ketiganya yang lama; berkas L3 baru nol temuan.
+      **Catatan invokasi:** `ruff` harus dijalankan **dari `backend/`** — dari repo root
+      tak ada `pyproject.toml`, jadi ruff memakai aturan default (RUF/I) dan melaporkan
+      13 "temuan" yang bukan pelanggaran konfigurasi proyek.
+- [x] Validator hijau atas seluruh `library/`.
+- [x] Semua baris tabel smoke §11 terbukti, termasuk **dua uji penolakan**
       (kutipan diubah satu huruf, dan blok kode di peta).
-- [ ] Entri §7 `CLAUDE.md` ditulis; L3 ✅ di roadmap; §6 CLAUDE.md dapat perintah baru.
-- [ ] **Invariant utuh:** nol prosa penjelasan sintesis di `library/`; nol tulisan ke DB
+      → `simplest`→`simplect` ⇒ `GROUNDING GAGAL`, exit 2, **nol berkas ditulis**;
+      code fence disunting ke peta ⇒ gerbang baca exit 1 `"peta memuat blok kode"`;
+      `--capture` stub L3 ⇒ **DITOLAK** (`body masih stub`).
+- [x] Entri §7 `CLAUDE.md` ditulis; L3 ✅ di roadmap; §6 CLAUDE.md dapat perintah baru.
+      → plus satu bagian baru di `library/README.md` yang mendaftar enam aturan mesin
+      `type: roadmap` (tak ada di rencana; tanpa itu penulis file roadmap tangan
+      ditolak tanpa tahu sebabnya).
+- [x] **Invariant utuh:** nol prosa penjelasan sintesis di `library/`; nol tulisan ke DB
       Forge; `node_ids` tetap kosong; tak ada field frontmatter ke-9.
+
+**Tiga penyimpangan kecil dari rencana — semuanya dicatat, bukan didiamkan:**
+
+1. **Course smoke `library/fastapi-l3-smoke/` DIHAPUS setelah diverifikasi.** §11 adalah
+   prosedur verifikasi, bukan daftar deliverable; `library/` adalah vault Obsidian Bryant,
+   dan course bernama "smoke" di sana adalah derau yang bukan tujuan belajarnya. Buktinya
+   hidup di test + laporan ini, dan skill bisa meregenerasinya kapan saja.
+2. **`library/README.md` dapat bagian "Aturan tambahan untuk `type: roadmap`".** Ia dokumen
+   format-beku L0; L3 menambah enam aturan yang ditegakkan mesin ke salah satu nilai
+   `type`-nya, jadi membiarkannya tak tercatat berarti gerbang yang menolak tanpa
+   menjelaskan.
+3. **Docstring modul `library_scaffold.py` & `verify_library.py` diperbarui** supaya tak lagi
+   mengklaim dirinya murni L1/L2 — keduanya kini memikul separuh gerbang L3.
+
+**Yang SENGAJA tidak dikerjakan:** `.claude/skills/run-learning-engine/SKILL.md` masih
+memakai path venv POSIX di 6 tempat. Gotcha #1 menyebut "dua skill lama" (lajur Library);
+skill itu di luar lingkup L3 dan pantas dapat commit sendiri.
 
 ---
 

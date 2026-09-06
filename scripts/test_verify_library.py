@@ -211,3 +211,91 @@ def test_aturan_roadmap_tak_menyentuh_file_note(lib, snaps):
     p = _write(lib, "fastapi-dasar/01-routing-dasar/get.md", _fm(),
                '\n# GET\n\ncatatanku.\n\n> "kutipan bebas yang tak ada di snapshot"\n')
     assert vl.validate_file(p, SRC_IDS, NODE_IDS) == []
+
+
+# ---------- L4: jembatan Library -> Forge (--link / --candidates) ----------
+
+def _peta_dengan_kandidat(kandidat="get-route-json", materi="get-route-json"):
+    return (f"\n# Routing dasar\n\n## Peta materi\n\n### [[{materi}|GET route]]\n"
+            f"**Reproduksi:** tulis route GET /.\n"
+            f"**Sumber:** `fastapi_docs_first_steps`\n> \"{QUOTE}\"\n"
+            f"**Kandidat node:** `{kandidat}` — belum ditempa (L4).\n")
+
+
+def test_link_mengisi_node_ids(lib):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/get.md", _fm(), "\nCatatan nyata.\n")
+    assert vl.link_node(p, SRC_IDS, NODE_IDS, "n002_get_json_route") == []
+    import yaml
+    fm = yaml.safe_load(p.read_text("utf-8").split("---")[1])
+    assert fm["node_ids"] == ["n002_get_json_route"]
+
+
+def test_link_menolak_node_yang_tak_ada(lib):
+    """Hanya node yang benar-benar lahir & termuat boleh ditautkan."""
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/get.md", _fm(), "\nCatatan nyata.\n")
+    reasons = vl.link_node(p, SRC_IDS, NODE_IDS, "n999_karangan")
+    assert reasons and "tak ada di data/" in reasons[0]
+    import yaml
+    assert yaml.safe_load(p.read_text("utf-8").split("---")[1])["node_ids"] == []
+
+
+def test_link_idempoten(lib):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/get.md",
+               _fm(node_ids=["n002_get_json_route"]), "\nCatatan nyata.\n")
+    sebelum = p.read_text("utf-8")
+    assert vl.link_node(p, SRC_IDS, NODE_IDS, "n002_get_json_route") == []
+    assert p.read_text("utf-8") == sebelum      # tak ditulis ulang
+
+
+def test_link_tidak_mengubah_status(lib):
+    """Menautkan node BUKAN klaim reproduksi — `status` harus tetap seperti semula."""
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/get.md",
+               _fm(status="outline"), "\nCatatan nyata.\n")
+    assert vl.link_node(p, SRC_IDS, NODE_IDS, "n002_get_json_route") == []
+    import yaml
+    fm = yaml.safe_load(p.read_text("utf-8").split("---")[1])
+    assert fm["status"] == "outline" and fm["node_ids"] == ["n002_get_json_route"]
+
+
+def test_link_mempertahankan_8_field_beku(lib):
+    p = _write(lib, "fastapi-dasar/01-routing-dasar/get.md", _fm(), "\nCatatan nyata.\n")
+    vl.link_node(p, SRC_IDS, NODE_IDS, "n002_get_json_route")
+    assert vl.validate_file(p, SRC_IDS, NODE_IDS) == []
+
+
+def test_candidates_menemukan_kandidat_belum_tertaut(lib, snaps):
+    _write(lib, "fastapi-dasar/01-routing-dasar/_index.md",
+           _fm(type="roadmap", source_refs=["fastapi_docs_first_steps"]),
+           _peta_dengan_kandidat())
+    _write(lib, "fastapi-dasar/01-routing-dasar/get-route-json.md", _fm(status="outline"),
+           "\nCatatan nyata.\n")
+    rows = vl.candidates()
+    assert len(rows) == 1
+    assert rows[0]["kandidat"] == "get-route-json"
+    assert rows[0]["node_ids"] == [] and rows[0]["ada"] is True
+
+
+def test_candidates_melewati_yang_sudah_tertaut(lib, snaps):
+    _write(lib, "fastapi-dasar/01-routing-dasar/_index.md",
+           _fm(type="roadmap", source_refs=["fastapi_docs_first_steps"]),
+           _peta_dengan_kandidat())
+    _write(lib, "fastapi-dasar/01-routing-dasar/get-route-json.md",
+           _fm(node_ids=["n002_get_json_route"]), "\nCatatan nyata.\n")
+    rows = vl.candidates()
+    assert rows[0]["node_ids"] == ["n002_get_json_route"]
+
+
+def test_candidates_melaporkan_materi_yang_berkasnya_tak_ada(lib, snaps):
+    """Gotcha #9: entri yang menunjuk berkas hilang dilaporkan APA ADANYA,
+    bukan dilewati diam-diam."""
+    _write(lib, "fastapi-dasar/01-routing-dasar/_index.md",
+           _fm(type="roadmap", source_refs=["fastapi_docs_first_steps"]),
+           _peta_dengan_kandidat(materi="tak-ada"))
+    rows = vl.candidates()
+    assert len(rows) == 1 and rows[0]["ada"] is False
+
+
+def test_candidates_melewati_file_note(lib, snaps):
+    """Kandidat hidup di PETA (`type: roadmap`), bukan di catatan Bryant."""
+    _write(lib, "fastapi-dasar/01-routing-dasar/get.md", _fm(), _peta_dengan_kandidat())
+    assert vl.candidates() == []

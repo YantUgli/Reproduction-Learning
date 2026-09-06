@@ -120,6 +120,44 @@ pemeriksaan "kutipan ⊆ snapshot" jadi melingkar.
 
 ---
 
+## Bagaimana progres dihitung (L5)
+
+Angka progres lajur ini adalah **% direproduksi, bukan % dibaca**. Ia dihitung
+`backend/app/services/library_progress.py` (dibaca `GET /library/progress` dan halaman
+`/library`) dengan menjoin `node_ids` ke DB Forge — **tak pernah** disimpan di
+frontmatter, karena status reproduksi hanya boleh datang dari eksekusi kode (§1.2) dan
+dua tempat penyimpanan = dua sumber kebenaran.
+
+| Keadaan materi | Syarat |
+|---|---|
+| **belum tertempa** (`unmapped`) | `node_ids` kosong |
+| **tertempa, belum dibuktikan** (`mapped_unproven`) | punya `node_ids`, tapi ada yang belum pernah lolos attempt mode dingin (termasuk node yang tak ada di DB) |
+| **direproduksi** (`reproduced`) | **semua** `node_ids`-nya pernah lolos attempt mode dingin |
+
+Penanda tambahan: **dikuasai** (semua node-nya `mastered`) dan **meluruh** (ada node
+`lapsed` — yang meluruh memorinya, bukan buktinya, jadi ia tetap dihitung terbukti).
+
+Yang perlu kamu tahu saat MENULIS materi:
+
+- **Yang menggerakkan angka hanya eksekusi kode.** "Attempt mode dingin" =
+  `verification`/`review`/`placement` (`app/services/kpi.REPRODUCE_MODES`). Latihan
+  berscaffold (`acquisition`) tak pernah dihitung.
+- **`status` (`outline`/`captured`) TIDAK PERNAH masuk hitungan.** Mengisi seluruh
+  catatanmu menghasilkan angka yang persis sama — dan itu diuji
+  (`test_status_captured_tidak_menggerakkan_angka`). Ia hanya tampil sebagai label netral.
+- **Materi tanpa `node_ids` tetap masuk penyebut.** Course tampil **berlubang** sampai
+  node-nya tertempa DAN terbukti. Itu tampilan yang benar, bukan bug: kalau materi tak
+  bernode dikeluarkan dari penyebut, course dengan satu materi tertempa akan tampil 100%.
+- **Hanya `type: note` & `transcription` yang masuk penyebut.** `outline` & `roadmap`
+  adalah berkas struktural (indeks & peta); memasukkannya menghukum course hanya karena
+  ia punya banyak modul.
+- **`node_ids` tak pernah diketik tangan/AI.** Penulisnya
+  `python scripts/verify_library.py --link <materi.md> --node <node_id>`, yang menolak
+  node yang tak ada di `data/`. Kalau ia boleh diketik, angka di atas bisa naik tanpa
+  satu baris kode pun dieksekusi.
+
+---
+
 ## Template siap-salin
 
 **`_index.md` course:**

@@ -78,6 +78,12 @@ sources:
     citation: "FastAPI — Dependencies: First Steps"
     url_or_locator: "https://fastapi.tiangolo.com/tutorial/dependencies/"
 
+  # --- L4 (jembatan Library→Forge) ---
+  - id: fastapi_docs_cookie_params
+    type: official_docs
+    citation: "FastAPI — Cookie Parameters"
+    url_or_locator: "https://fastapi.tiangolo.com/tutorial/cookie-params/"
+
   # --- Domain kedua (M6) · React ---
   - id: react_docs_state
     type: official_docs
