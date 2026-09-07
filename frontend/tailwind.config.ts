@@ -29,6 +29,9 @@ const config: Config = {
           fg: "var(--accent-fg)",
         },
         neutral: { DEFAULT: "var(--neutral)", bg: "var(--neutral-bg)" },
+        // ember — peran BARU (brief §8): kehangatan scaffold / dukungan yang memudar
+        // menuju L0. Bukan aksi (accent), bukan bukti (success).
+        ember: { DEFAULT: "var(--ember)", bg: "var(--ember-bg)" },
         success: { DEFAULT: "var(--success)", bg: "var(--success-bg)" },
         danger: { DEFAULT: "var(--danger)", bg: "var(--danger-bg)" },
         warning: { DEFAULT: "var(--warning)", bg: "var(--warning-bg)" },
@@ -44,8 +47,11 @@ const config: Config = {
         md: "0 3px 8px rgba(31,35,40,.10)",
       },
       maxWidth: { content: "820px", wide: "980px" },
+      // Font Plex self-hosted (globals.css @font-face + var). `sans` & `mono` menunjuk
+      // CSS var yang sama supaya satu sumber kebenaran face — sejajar pola warna.
       fontFamily: {
-        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
+        sans: ["var(--font-sans)"],
+        mono: ["var(--font-mono)"],
       },
     },
   },

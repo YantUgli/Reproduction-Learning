@@ -3,12 +3,67 @@
 @tailwind utilities;
 
 /*
+ * IBM Plex — SELF-HOSTED (woff2 di public/fonts/), bukan CDN runtime. Alasannya sama
+ * dengan Monaco (§7 2026-08-24): local-first = font harus muncul tanpa internet, dan
+ * versinya ter-pin. Plex dipilih karena identitas "engineered / build-not-consume" dan
+ * mono-nya memang dirancang untuk kode — dan produk ini penuh id node, contract, output
+ * test, angka KPI. Superfamily tunggal (Sans + Mono) = disiplin, satu keluarga.
+ */
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/plex-sans-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/plex-sans-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/plex-sans-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/plex-sans-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/plex-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/plex-mono-500.woff2") format("woff2");
+}
+
+/*
  * Design tokens — SATU sumber kebenaran warna (dibaca tailwind.config.ts).
  * Light mode dulu. Dark mode nanti = tambah blok `.dark { ... }` di bawah + toggle
  * class di <html>; tak ada komponen yang perlu diubah karena semua memakai token.
  * Palet = GitHub Primer yang sudah dipakai sejak M3.
  */
 :root {
+  /* Face stack — Plex superfamily dengan fallback sistem (offline aman). Dibaca
+   * tailwind.config.ts sebagai fontFamily.sans / .mono. */
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
   --canvas: #f6f8fa;
   --surface: #ffffff;
   --surface-muted: #f6f8fa;
@@ -30,6 +85,13 @@
 
   --neutral: #57606a;
   --neutral-bg: #eaeef2;
+  /* --ember: peran BARU (brief §8). "Dukungan scaffold / kehangatan" — ujung hangat
+   * temper line (L3 worked example), materi just-in-time, afordansi bersifat menopang.
+   * Sengaja BUKAN --accent (aksi) dan BUKAN --success (yang tetap milik bukti eksekusi):
+   * ember menandai bantuan yang MEMUDAR menuju L0 yang dingin. Oranye Primer → satu
+   * keluarga, kontras teruji. */
+  --ember: #bc4c00;
+  --ember-bg: #fff1e5;
   --success: #1a7f37;
   --success-bg: #dafbe1;
   --danger: #cf222e;
@@ -51,7 +113,7 @@ html {
 body {
   background: var(--canvas);
   color: var(--fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* Fokus keyboard yang konsisten & terlihat (aksesibilitas) tanpa mengganggu klik mouse. */
