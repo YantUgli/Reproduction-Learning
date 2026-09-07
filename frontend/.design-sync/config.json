@@ -1,0 +1,37 @@
+{
+  "projectId": "8f2a5bb1-503c-4636-bdbe-3ff2fb61c133",
+  "pkg": "reproduction-learning-engine-frontend",
+  "globalName": "RLE",
+  "shape": "package",
+  "srcDir": "app/components",
+  "tsconfig": ".design-sync/tsconfig.sync.json",
+  "cssEntry": ".design-sync/compiled.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "extraFonts": [
+    "public/fonts/plex-sans-400.woff2",
+    "public/fonts/plex-sans-500.woff2",
+    "public/fonts/plex-sans-600.woff2",
+    "public/fonts/plex-sans-700.woff2",
+    "public/fonts/plex-mono-400.woff2",
+    "public/fonts/plex-mono-500.woff2"
+  ],
+  "overrides": {
+    "ConfirmDialog": { "cardMode": "single", "viewport": "560x360" }
+  },
+  "componentSrcMap": {
+    "Button": "app/components/ui/Button.tsx",
+    "Card": "app/components/ui/Card.tsx",
+    "Badge": "app/components/ui/Badge.tsx",
+    "Container": "app/components/ui/Container.tsx",
+    "EmptyState": "app/components/ui/EmptyState.tsx",
+    "ErrorState": "app/components/ui/ErrorState.tsx",
+    "PageHeader": "app/components/ui/PageHeader.tsx",
+    "ConfirmDialog": "app/components/ui/ConfirmDialog.tsx",
+    "Skeleton": "app/components/ui/Skeleton.tsx",
+    "StatusBadge": "app/components/StatusBadge.tsx",
+    "ProbeCard": "app/components/ProbeCard.tsx",
+    "TestOutput": "app/components/TestOutput.tsx",
+    "Timebox": "app/components/Timebox.tsx",
+    "Markdown": "app/components/Markdown.tsx"
+  }
+}
