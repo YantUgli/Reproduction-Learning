@@ -14,12 +14,13 @@ import {
 } from "../../../lib/api";
 import Markdown from "../../components/Markdown";
 import ProbeCard from "../../components/ProbeCard";
+import TemperLine from "../../components/TemperLine";
 import Timebox from "../../components/Timebox";
 import TestOutput from "../../components/TestOutput";
 import Container from "../../components/ui/Container";
 import Button from "../../components/ui/Button";
 import { useConfirm } from "../../components/ui/ConfirmProvider";
-import { IconArrowRight, IconCheck } from "../../components/ui/Icon";
+import { IconArrowRight, IconCheck, IconChevronLeft } from "../../components/ui/Icon";
 import ErrorState from "../../components/ui/ErrorState";
 import { EditorSkeleton } from "../../components/ui/Skeleton";
 
@@ -187,6 +188,7 @@ export default function NodeSession({ params }: { params: { id: string } }) {
   }
 
   const isVerify = level.kind === "verify";
+  const isWorkedExample = level.kind === "worked_example";
   const cleanPass = grade?.passed && acquired;
 
   return (
@@ -213,52 +215,37 @@ export default function NodeSession({ params }: { params: { id: string } }) {
         )}
       </div>
 
-      {/* Peta level — user selalu tahu posisinya, dan bisa lompat bebas
-          (mis. balik ke L3 melihat materi lagi). Aman untuk invariant §1:
-          L3–L1 tak mengirim attempt, sinyal reproduce-without-AI dihitung dari
-          attempt L0.
+      {/* TEMPER LINE (tanda tangan §8) — menggantikan peta level datar. User selalu
+          tahu posisinya di tangga, dan bisa lompat bebas (mis. balik ke L3 lihat materi
+          lagi). Aman untuk invariant §1: L3–L1 tak mengirim attempt; sinyal
+          reproduce-without-AI dihitung dari attempt L0.
 
-          PENTING: level yang sudah DILEWATI ditandai NETRAL (titik + border), BUKAN
-          centang hijau. Centang hijau = "terverifikasi benar lewat eksekusi"; melewati
-          scaffold hanyalah navigasi, tak ada test yang jalan. Memberi ✓ hijau di sini
-          justru memproduksi illusion of competence yang ditolak invariant §1. */}
-      <div className="my-4 flex flex-wrap items-center gap-1.5">
-        {node.levels.map((lv, i) => {
-          const active = i === levelIndex;
-          const visited = i < levelIndex; // scaffold sudah dilewati (navigasi, bukan lulus test)
-          return (
-            <button
-              key={lv}
-              type="button"
-              onClick={() => goToLevel(i)}
-              aria-current={active ? "step" : undefined}
-              title={active ? `Kamu di ${lv}` : visited ? `Kembali ke ${lv}` : `Lompat ke ${lv}`}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-13 font-semibold transition-colors ${
-                active
-                  ? "border-accent bg-accent text-accent-fg"
-                  : visited
-                    ? "border-border bg-surface text-fg hover:bg-surface-muted"
-                    : "border-transparent bg-neutral-bg text-muted hover:bg-border-muted"
-              }`}
-            >
-              {visited && (
-                <span
-                  aria-hidden="true"
-                  className="inline-block h-1.5 w-1.5 rounded-full bg-subtle"
-                />
-              )}
-              {lv}
-            </button>
-          );
-        })}
-        <span className="ml-1 text-xs text-subtle">
-          klik untuk pindah level (mis. balik ke L3 lihat materi)
-        </span>
+          PENTING: titik = DILEWATI (navigasi), BUKAN centang hijau. Centang hijau =
+          "terverifikasi eksekusi"; ia hidup di panel hasil, tak pernah di temper line. */}
+      <div className="my-6 px-3">
+        <TemperLine levels={node.levels} activeIndex={levelIndex} onSelect={goToLevel} />
       </div>
 
-      <h2 className="text-lg font-semibold">{level.title}</h2>
-      <div className="mt-2 rounded-md border border-border bg-surface-muted px-4 py-3">
-        <Markdown>{level.prompt}</Markdown>
+      {/* L3 worked example = ujung HANGAT (ember): dukungan penuh. Level dingin (L0)
+          tak diberi kehangatan. */}
+      <div
+        className={`rounded-md px-4 py-3 ${
+          isWorkedExample
+            ? "border border-ember border-l-[3px] border-l-ember bg-ember-bg"
+            : "border border-border bg-surface-muted"
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-lg font-semibold">{level.title}</h2>
+          {isWorkedExample && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-ember px-2 py-0.5 font-mono text-[11px] font-semibold text-accent-fg">
+              ember · tersokong penuh
+            </span>
+          )}
+        </div>
+        <div className="mt-2">
+          <Markdown>{level.prompt}</Markdown>
+        </div>
       </div>
 
       {level.signature_contract && (
@@ -416,8 +403,12 @@ export default function NodeSession({ params }: { params: { id: string } }) {
 
 function BackLink() {
   return (
-    <Link href="/" className="text-sm text-accent hover:underline">
-      ← Dashboard
+    <Link
+      href="/"
+      className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg hover:no-underline"
+    >
+      <IconChevronLeft size={15} />
+      Forge
     </Link>
   );
 }

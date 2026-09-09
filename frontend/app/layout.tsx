@@ -1,4 +1,5 @@
 import "./globals.css";
+import AreaSwitch from "./components/AreaSwitch";
 import { ConfirmProvider } from "./components/ui/ConfirmProvider";
 
 export const metadata = {
@@ -13,8 +14,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className="min-h-screen bg-canvas px-4 py-8 text-fg antialiased sm:px-8">
-        <ConfirmProvider>{children}</ConfirmProvider>
+      <body className="min-h-screen bg-canvas text-fg antialiased">
+        <ConfirmProvider>
+          {/* Frame orientasi persisten (§5/§8): Forge · Library · Authoring. */}
+          <AreaSwitch />
+          <div className="px-4 py-8 sm:px-8">{children}</div>
+        </ConfirmProvider>
       </body>
     </html>
   );

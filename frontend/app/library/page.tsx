@@ -8,13 +8,18 @@ import {
   type LibraryMaterial,
   type LibraryProgress,
 } from "../../lib/api";
-import Badge, { type BadgeTone } from "../components/ui/Badge";
+import Badge, { type BadgeTone, type BadgeVariant } from "../components/ui/Badge";
 import Card from "../components/ui/Card";
 import Container from "../components/ui/Container";
 import EmptyState from "../components/ui/EmptyState";
 import ErrorState from "../components/ui/ErrorState";
 import PageHeader from "../components/ui/PageHeader";
-import { IconArrowRight, IconInbox } from "../components/ui/Icon";
+import { IconArrowRight, IconCheck, IconInbox } from "../components/ui/Icon";
+
+// Hatch "mapped · unproven" (§7.5): dukungan yang dipetakan tapi BELUM terbukti — dirender
+// bergaris (bukan solid), Proof Law: hanya yang terbukti eksekusi yang solid. Token-based.
+const HATCH =
+  "repeating-linear-gradient(45deg, var(--neutral-bg) 0 4px, var(--surface) 4px 8px)";
 
 /**
  * Halaman lajur Library (L5) — PENJAGA metrik, bukan katalog bacaan.
@@ -41,6 +46,7 @@ export default function LibraryPage() {
   return (
     <Container>
       <PageHeader
+        back={null}
         title="Library"
         subtitle={
           <>
@@ -65,17 +71,37 @@ export default function LibraryPage() {
 
       {data && data.courses.length > 0 && (
         <>
-          <Card className="p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted">
-              materi direproduksi
-            </div>
-            <div className="mt-0.5 text-3xl font-bold leading-tight tabular-nums">
-              {pct(data.reproduced_pct, data.reproduced, data.total)}
-            </div>
-            <div className="mt-0.5 text-xs text-muted tabular-nums">
-              {data.reproduced}/{data.total} materi terbukti tanpa AI
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+              <div>
+                <div className="font-mono text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  direproduksi
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  {/* Proof Law (§8): angka ini = yang TERBUKTI eksekusi → proof-green. */}
+                  <span className="font-mono text-5xl font-bold leading-none tabular-nums text-success">
+                    {pct(data.reproduced_pct, data.reproduced, data.total)}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[11px] font-semibold text-success">
+                    <span className="h-2 w-2 rounded-sm bg-success" aria-hidden="true" />
+                    terbukti eksekusi
+                  </span>
+                </div>
+              </div>
+              <div className="min-w-[240px] flex-1">
+                <p className="text-13 text-muted">
+                  Menghitung hanya node yang terbukti di L0 — tak pernah materi yang kamu baca.
+                  Ia <strong className="font-semibold text-fg">tak bisa 100%</strong> sampai
+                  setiap node terpetakan terbukti; persen terakhir dihasilkan, bukan dibulatkan.
+                </p>
+                <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-dashed border-border px-2.5 py-1 font-mono text-[11px] text-subtle tabular-nums">
+                  ceiling 99% · {data.reproduced}/{data.total} terbukti
+                </div>
+              </div>
             </div>
           </Card>
+
+          <BarLegend />
 
           <div className="mt-6 space-y-8">
             {data.courses.map((c) => (
@@ -104,25 +130,69 @@ function pct(v: number | null, done?: number, total?: number): string {
   return `${p}%`;
 }
 
+/** Legenda bar (§7.5): tiga keadaan, tiga bentuk berbeda — proven solid, unproven
+ *  bergaris, unmapped lubang putus-putus. */
+function BarLegend() {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-13 text-muted">
+      <span className="font-mono text-[11px] font-semibold uppercase tracking-wide text-subtle">
+        legenda bar
+      </span>
+      <span className="inline-flex items-center gap-2">
+        <span className="h-2.5 w-6 rounded-sm bg-success" aria-hidden="true" />
+        direproduksi
+      </span>
+      <span className="inline-flex items-center gap-2">
+        <span className="h-2.5 w-6 rounded-sm" style={{ background: HATCH }} aria-hidden="true" />
+        tertempa · belum dibuktikan
+      </span>
+      <span className="inline-flex items-center gap-2">
+        <span
+          className="h-2.5 w-6 rounded-sm border border-dashed border-subtle bg-surface"
+          aria-hidden="true"
+        />
+        belum tertempa — lubangnya
+      </span>
+    </div>
+  );
+}
+
 function CourseSection({ course }: { course: LibraryCourse }) {
-  const width = Math.min(100, Math.round((course.reproduced_pct ?? 0) * 100));
+  const seg = (n: number) => (course.total > 0 ? (n / course.total) * 100 : 0);
+  const repW = seg(course.reproduced);
+  const mapW = seg(course.mapped_unproven);
+  const unmapW = seg(course.unmapped);
   return (
     <section>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-lg font-semibold">{course.title}</h2>
-        <span className="text-sm text-muted tabular-nums">
+        <span className="font-mono text-13 text-muted tabular-nums">
           {course.reproduced}/{course.total} direproduksi · {course.unmapped} belum
           tertempa
         </span>
       </div>
 
-      {/* Bar = proporsi materi yang TERBUKTI. Materi tanpa node ikut penyebut, jadi
-          lubangnya terlihat sebagai ruang kosong — itu memang maksudnya. */}
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-neutral-bg">
-        <div className="h-full bg-success" style={{ width: `${width}%` }} />
+      {/* Bar TIGA segmen (§7.5): terbukti (solid green) · tertempa-belum-terbukti
+          (bergaris — Proof Law: bukan solid) · belum-tertempa (LUBANG putus-putus, "the
+          hole is the point"). Materi tanpa node ikut penyebut, jadi lubangnya nyata. */}
+      <div className="mt-2 flex h-3 w-full overflow-hidden rounded-full border border-border-muted bg-surface-muted">
+        {repW > 0 && <div className="h-full bg-success" style={{ width: `${repW}%` }} />}
+        {mapW > 0 && (
+          <div className="h-full" style={{ width: `${mapW}%`, background: HATCH }} />
+        )}
+        {unmapW > 0 && (
+          <div
+            className="h-full border-l border-dashed border-subtle"
+            style={{ width: `${unmapW}%` }}
+          />
+        )}
+      </div>
+      <div className="mt-1.5 font-mono text-[11px] text-subtle tabular-nums">
+        {Math.round(repW)}% direproduksi · {Math.round(mapW)}% tertempa-belum-terbukti ·{" "}
+        {Math.round(unmapW)}% belum tertempa (lubang yang terlihat, bukan bug)
       </div>
 
-      <div className="mt-3 space-y-4">
+      <div className="mt-4 space-y-4">
         {course.modules.map((m) => (
           <div key={m.module}>
             <h3 className="text-sm font-semibold text-muted">{m.title}</h3>
@@ -140,26 +210,64 @@ function CourseSection({ course }: { course: LibraryCourse }) {
   );
 }
 
-const STATE_LABEL: Record<LibraryMaterial["state"], { text: string; tone: BadgeTone }> = {
-  unmapped: { text: "belum tertempa", tone: "neutral" },
-  mapped_unproven: { text: "tertempa, belum dibuktikan", tone: "warning" },
-  reproduced: { text: "direproduksi", tone: "success" },
+// Proof Law (§8): hanya yang TERBUKTI eksekusi (`reproduced`) tampil solid; yang belum
+// terbukti (unmapped/mapped_unproven) tampil outline/ghost — sejajar StatusBadge.
+const STATE_LABEL: Record<
+  LibraryMaterial["state"],
+  { text: string; tone: BadgeTone; variant: BadgeVariant }
+> = {
+  unmapped: { text: "belum tertempa", tone: "neutral", variant: "outline" },
+  mapped_unproven: { text: "tertempa, belum dibuktikan", tone: "warning", variant: "outline" },
+  reproduced: { text: "direproduksi", tone: "success", variant: "solid" },
 };
+
+/** Penanda status (§7.5 / Proof Law): hanya `reproduced` yang dapat lingkaran terisi +
+ *  centang (terbukti eksekusi). `mapped_unproven` = lingkaran putus-putus; `unmapped` =
+ *  kotak putus-putus. Centang HANYA milik yang dibuktikan kode. */
+function StateMarker({ state }: { state: LibraryMaterial["state"] }) {
+  if (state === "reproduced") {
+    return (
+      <span
+        aria-hidden="true"
+        className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-success text-accent-fg"
+      >
+        <IconCheck size={11} />
+      </span>
+    );
+  }
+  if (state === "mapped_unproven") {
+    return (
+      <span
+        aria-hidden="true"
+        className="h-4 w-4 shrink-0 rounded-full border-2 border-dashed border-subtle bg-surface"
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="h-4 w-4 shrink-0 rounded-[3px] border border-dashed border-subtle bg-surface"
+    />
+  );
+}
 
 function MaterialRow({ material }: { material: LibraryMaterial }) {
   const label = STATE_LABEL[material.state];
   return (
     <Card className="flex flex-wrap items-center justify-between gap-2 p-3">
-      <div className="min-w-0">
-        <div className="truncate font-medium">{material.title}</div>
-        <div className="mt-0.5 truncate font-mono text-xs text-subtle">
-          {material.node_ids.length > 0 ? material.node_ids.join(" · ") : "belum ada node"}
-          {material.missing_node_ids.length > 0 && (
-            <span className="text-danger">
-              {" "}
-              · node hilang: {material.missing_node_ids.join(", ")}
-            </span>
-          )}
+      <div className="flex min-w-0 items-center gap-3">
+        <StateMarker state={material.state} />
+        <div className="min-w-0">
+          <div className="truncate font-medium">{material.title}</div>
+          <div className="mt-0.5 truncate font-mono text-xs text-subtle">
+            {material.node_ids.length > 0 ? material.node_ids.join(" · ") : "belum ada node"}
+            {material.missing_node_ids.length > 0 && (
+              <span className="text-danger">
+                {" "}
+                · node hilang: {material.missing_node_ids.join(", ")}
+              </span>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -167,7 +275,9 @@ function MaterialRow({ material }: { material: LibraryMaterial }) {
         <span className="text-xs text-subtle">catatan: {material.note_status || "—"}</span>
         {material.decayed && <Badge tone="warning">meluruh</Badge>}
         {material.mastered && <Badge tone="info">dikuasai</Badge>}
-        <Badge tone={label.tone}>{label.text}</Badge>
+        <Badge tone={label.tone} variant={label.variant}>
+          {label.text}
+        </Badge>
         {material.node_ids.length > 0 && material.missing_node_ids.length === 0 && (
           <Link
             href={`/node/${material.node_ids[0]}`}

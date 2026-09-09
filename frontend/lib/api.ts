@@ -179,7 +179,9 @@ export interface PlacementSubmitOut {
 }
 
 // --- M5: integrasi Claude Code (async via artifact + review Isyah) ---
-export type JobRole = "r2" | "r3" | "r4";
+// `node` (L4) ditambahkan backend sebagai R4 mode kelahiran node — brief §7.7 minta
+// tipe & UI direkonsiliasi supaya job node-birth ikut ter-render.
+export type JobRole = "r2" | "r3" | "r4" | "node";
 export type JobStatus =
   | "pending"
   | "running"
@@ -238,6 +240,41 @@ export interface Explanation {
   node_id: string;
   markdown: string;
   worked_example: string;
+}
+
+// --- M7: meja audit (telemetri kurikulum, bukan gerbang manusia) ---
+// Sinyal per node: never-fails=trivia, never-passes=broken, low-discrimination.
+export interface AuditSignal {
+  node_id: string;
+  kind: string;
+  detail: string;
+  samples: number;
+}
+
+// Edge yang BELUM terkukuhkan (bukti konstruk hulu tak terlihat di hilir). Laporan,
+// bukan gerbang (§7 2026-09-01): ketiadaan bukti tak membuktikan edge itu salah.
+export interface AuditEdge {
+  from_node_id: string;
+  to_node_id: string;
+  kind: string;
+  reason: string;
+}
+
+// Seberapa banyak kurikulum yang PUNYA data — tanpa ini, "tak ada temuan" mudah
+// terbaca "semuanya sehat", padahal dengan n=1 hampir selalu "belum ada datanya".
+export interface AuditCoverage {
+  nodes: number;
+  nodes_with_cold_data: number;
+  nodes_assessable: number;
+  min_attempts: number;
+  lapsed_now: number;
+}
+
+export interface AuditOut {
+  coverage: AuditCoverage;
+  node_signals: AuditSignal[];
+  edge_findings: AuditEdge[];
+  domains_without_destination: string[];
 }
 
 // --- L5: lajur Library ("% direproduksi", bukan "% dibaca") ---
@@ -387,6 +424,20 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }).then(j<AuthoringJob>),
+  // L4 — satu entri peta Library → satu node Forge (R4 mode `node`).
+  triggerNode: (body: {
+    library_file: string;
+    slug: string;
+    domain_id: string;
+    concept: string;
+    source_ref_id: string;
+    prereq_node_id?: string;
+  }) =>
+    fetch(`${BACKEND_URL}/authoring/node`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(j<AuthoringJob>),
   triggerR2: (body: { repo_path: string; node_ids?: string[] }) =>
     fetch(`${BACKEND_URL}/authoring/r2`, {
       method: "POST",
@@ -407,4 +458,8 @@ export const api = {
     fetch(`${BACKEND_URL}/authoring/hypotheses${nodeId ? `?node_id=${nodeId}` : ""}`).then(
       j<Hypothesis[]>,
     ),
+
+  // M7 — meja audit: telemetri MENANDAI node curiga; pencabutan tetap satu klik manusia
+  // (belum ada endpoint — lihat kontrol pending di /authoring).
+  getAudit: () => fetch(`${BACKEND_URL}/authoring/audit`).then(j<AuditOut>),
 };

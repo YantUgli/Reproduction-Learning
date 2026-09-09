@@ -95,3 +95,50 @@ export function IconTarget({ className, size = 28 }: IconProps) {
     className,
   );
 }
+
+/** Kiri (chevron) — back link di frame. */
+export function IconChevronLeft({ className, size = 16 }: IconProps) {
+  return svg(<path d="M15 6l-6 6 6 6" />, size, className);
+}
+
+/** Forge — belah ketupat (metal/tempa). Ikon area Bryant (loop reproduksi). */
+export function IconForge({ className, size = 16 }: IconProps) {
+  return svg(<path d="M12 3 21 12 12 21 3 12Z" />, size, className);
+}
+
+/** Library — tiga garis peta/indeks. */
+export function IconLibrary({ className, size = 16 }: IconProps) {
+  return svg(<path d="M4 6h16M4 12h16M4 18h16" />, size, className);
+}
+
+/** Authoring — slider/kurasi (dua simpul di garis). Meja Isyah, bukan jalur Bryant. */
+export function IconAuthoring({ className, size = 16 }: IconProps) {
+  return svg(
+    <>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <circle cx="9" cy="7" r="2" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+      <circle cx="15" cy="17" r="2" />
+    </>,
+    size,
+    className,
+  );
+}
+
+/** Segitiga peringatan — node yang ditandai telemetri di meja audit. */
+export function IconAlert({ className, size = 16 }: IconProps) {
+  return svg(
+    <>
+      <path d="M12 3 22 20H2L12 3Z" />
+      <path d="M12 10v4" />
+      <path d="M12 17h.01" />
+    </>,
+    size,
+    className,
+  );
+}
+
+/** Play — tombol jalankan. */
+export function IconPlay({ className, size = 15 }: IconProps) {
+  return svg(<path d="M6 4l14 8-14 8V4Z" />, size, className);
+}

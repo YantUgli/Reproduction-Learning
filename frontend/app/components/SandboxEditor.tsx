@@ -41,10 +41,23 @@ if (typeof window !== "undefined") {
   // Mematikan diagnostics + seluruh fitur mode membuat JS/TS berperilaku seperti Python:
   // highlight sintaks tetap (tokenizer main-thread), tapi tak ada worker bahasa yang
   // dipanggil. §2 aman, error hilang.
-  for (const d of [
-    monaco.languages.typescript.javascriptDefaults,
-    monaco.languages.typescript.typescriptDefaults,
-  ]) {
+  // Type resmi `monaco.languages.typescript` di monaco-editor 0.55 muncul sebagai stub
+  // `{ deprecated: true }` (bug type-def paket) — padahal `javascript/typescriptDefaults`
+  // ADA di runtime. Cast minimal ke bentuk yang kita pakai; nol perubahan perilaku, murni
+  // agar `tsc`/`next build` hijau. (Bukan `any`: hanya dua metode yang benar-benar dipanggil.)
+  type TsDefaults = {
+    setDiagnosticsOptions(opts: {
+      noSemanticValidation?: boolean;
+      noSyntacticValidation?: boolean;
+      noSuggestionDiagnostics?: boolean;
+    }): void;
+    setModeConfiguration(cfg: Record<string, boolean>): void;
+  };
+  const tsNs = monaco.languages.typescript as unknown as {
+    javascriptDefaults: TsDefaults;
+    typescriptDefaults: TsDefaults;
+  };
+  for (const d of [tsNs.javascriptDefaults, tsNs.typescriptDefaults]) {
     d.setDiagnosticsOptions({
       noSemanticValidation: true,
       noSyntacticValidation: true,

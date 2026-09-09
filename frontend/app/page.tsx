@@ -141,10 +141,9 @@ function DueSection({ due }: { due: DueItem[] }) {
           <Link href="/library" className="inline-flex items-center gap-1 text-accent hover:underline">
             Library <IconArrowRight size={14} />
           </Link>
-          {/* Meja kerja Isyah (M5), bukan jalur belajar Bryant. */}
-          <Link href="/authoring" className="inline-flex items-center gap-1 text-accent hover:underline">
-            Review authoring <IconArrowRight size={14} />
-          </Link>
+          {/* Role bleed dihapus (brief §4): tautan "Review authoring" adalah meja
+              Isyah, bukan jalur Bryant. Authoring kini hidup di frame area-switch
+              (§5), dan disembunyikan saat kill switch mati. */}
         </span>
       </div>
 

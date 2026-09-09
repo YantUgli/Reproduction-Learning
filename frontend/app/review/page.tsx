@@ -19,7 +19,7 @@ import Container from "../components/ui/Container";
 import Card from "../components/ui/Card";
 import EmptyState from "../components/ui/EmptyState";
 import ErrorState from "../components/ui/ErrorState";
-import { IconCheck, IconInbox } from "../components/ui/Icon";
+import { IconCheck, IconChevronLeft, IconInbox } from "../components/ui/Icon";
 
 /**
  * Sesi review harian (M4).
@@ -240,8 +240,12 @@ function OutcomePanel({ outcome }: { outcome: Outcome }) {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <Container>
-      <Link href="/" className="text-sm text-accent hover:underline">
-        ← Dashboard
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg hover:no-underline"
+      >
+        <IconChevronLeft size={15} />
+        Forge
       </Link>
       <div className="mt-3">{children}</div>
     </Container>

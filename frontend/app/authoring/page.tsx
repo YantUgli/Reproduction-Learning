@@ -1,422 +1,314 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import {
-  api,
-  type AuthoringJob,
-  type AuthoringJobDetail,
-  type Hypothesis,
-  type IntegrationStatus,
-  type NodeSummary,
-} from "../../lib/api";
+import { api, type AuditEdge, type AuditOut, type AuditSignal } from "../../lib/api";
 import Container from "../components/ui/Container";
 import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import Badge, { type BadgeTone } from "../components/ui/Badge";
+import EmptyState from "../components/ui/EmptyState";
+import ErrorState from "../components/ui/ErrorState";
+import { IconAlert, IconArrowRight } from "../components/ui/Icon";
+import AuthoringNav from "./AuthoringNav";
+
+// Hatch "belum ada data" — bagian kurikulum yang belum diuji dingin. Sama pola dengan
+// bar Library: yang belum terbukti bergaris, bukan solid.
+const HATCH =
+  "repeating-linear-gradient(45deg, var(--neutral-bg) 0 4px, var(--surface) 4px 8px)";
 
 /**
- * Review authoring (M5) — antrean artifact Claude Code menunggu keputusan Isyah.
+ * MEJA AUDIT (M7, primer) — brief §7.6.
  *
- * Halaman ini adalah **gerbang manusia**, lapis terakhir setelah skema & gate
- * otomatis. Tak ada artifact yang masuk `data/`/DB tanpa tombol Approve di sini.
- * Yang di-review adalah KONTEN; format sudah dijamin backend (`contracts.py`).
+ * Sejak 2026-08-31 peran Isyah bukan lagi gerbang blokir: gerbang mesin + promosi
+ * otomatis yang memutuskan, dan mata Isyah di level kurikulum diganti **telemetri**.
+ * Halaman ini menampilkan node yang telemetri-nya curiga — dengan ALASAN & ANGKA —
+ * supaya keputusan pensiun bisa diambil dalam hitungan detik.
  *
- * Bukan halaman untuk Bryant — ini meja kerja Isyah.
+ * BUKAN dashboard, bukan graf (§8 tolak DAG explorer): daftar bertanda + alasan.
+ *
+ * Batas jujur (§7.6): dengan **n=1** telemetri hanya MENANDAI; tak ada pensiun
+ * otomatis. Dan aksi **retire** + **set-destination** BELUM punya endpoint — dirender
+ * sebagai kontrol pending, bukan tombol yang berpura-pura bekerja.
  */
-export default function AuthoringPage() {
-  const [status, setStatus] = useState<IntegrationStatus | null>(null);
-  const [jobs, setJobs] = useState<AuthoringJob[] | null>(null);
-  const [nodes, setNodes] = useState<NodeSummary[]>([]);
-  const [selected, setSelected] = useState<AuthoringJobDetail | null>(null);
-  const [hypotheses, setHypotheses] = useState<Hypothesis[]>([]);
-  const [note, setNote] = useState<string | null>(null);
+export default function AuditDeskPage() {
+  const [audit, setAudit] = useState<AuditOut | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    try {
-      const [s, j, h] = await Promise.all([
-        api.getIntegrationStatus(),
-        api.listJobs(),
-        api.listHypotheses(),
-      ]);
-      setStatus(s);
-      setJobs(j);
-      setHypotheses(h);
-    } catch (e) {
-      setError(String(e));
-    }
+  const load = useCallback(() => {
+    setError(null);
+    api.getAudit().then(setAudit).catch((e) => setError(String(e)));
   }, []);
 
-  useEffect(() => {
-    refresh();
-    api.listNodes().then(setNodes).catch(() => undefined);
-  }, [refresh]);
-
-  // Job `pending`/`running` berubah di latar (Claude Code masih jalan) — polling
-  // ringan supaya antrean tak perlu di-refresh manual.
-  useEffect(() => {
-    const working = jobs?.some((j) => j.status === "pending" || j.status === "running");
-    if (!working) return;
-    const t = setTimeout(refresh, 4000);
-    return () => clearTimeout(t);
-  }, [jobs, refresh]);
-
-  const open = async (id: string) => {
-    setNote(null);
-    try {
-      setSelected(await api.getJob(id));
-    } catch (e) {
-      setError(String(e));
-    }
-  };
-
-  const trigger = async (fn: () => Promise<AuthoringJob>) => {
-    setError(null);
-    setNote(null);
-    try {
-      const job = await fn();
-      setNote(`Job ${job.id} dibuat — Claude Code jalan di latar.`);
-      refresh();
-    } catch (e) {
-      setError(String(e));
-    }
-  };
-
-  const approve = async (id: string) => {
-    setError(null);
-    try {
-      const out = await api.approveJob(id);
-      setNote(
-        out.written_paths.length
-          ? `Approved. File ditulis: ${out.written_paths.join(", ")}`
-          : `Approved. Efek DB: ${JSON.stringify(out.db_effect)}`,
-      );
-      setSelected(null);
-      refresh();
-    } catch (e) {
-      setError(String(e));
-    }
-  };
-
-  const reject = async (id: string) => {
-    const reason = window.prompt("Alasan menolak (tercatat di job.json):") ?? "";
-    try {
-      await api.rejectJob(id, reason);
-      setSelected(null);
-      refresh();
-    } catch (e) {
-      setError(String(e));
-    }
-  };
+  useEffect(load, [load]);
 
   return (
     <Container wide>
       <PageHeader
-        title="Authoring · review artifact Claude Code"
-        subtitle="AI mengUSULkan; kamu yang memutuskan. Tak ada artifact yang masuk sistem tanpa Approve di halaman ini."
+        title="Authoring · Audit desk"
+        subtitle="Node yang telemetri-nya distrust — dengan alasan dan angkanya. Kurasi pindah ke belakang: gerbang mesin yang memutuskan konten masuk; ini tempat menandai mana yang ternyata tak layak."
+        back={null}
       />
+      <AuthoringNav />
 
-      {status && <StatusBar status={status} />}
-      {note && <Banner tone="ok">{note}</Banner>}
-      {error && <Banner tone="bad">{error}</Banner>}
+      {error && <ErrorState error={error} onRetry={load} />}
+      {!audit && !error && <p className="text-muted">Memuat telemetri…</p>}
 
-      <TriggerPanel nodes={nodes} disabled={!status?.enabled} onTrigger={trigger} />
-
-      <h2 className="mt-8 text-lg font-semibold">Antrean</h2>
-      {!jobs && <p className="mt-2 text-muted">Memuat…</p>}
-      {jobs?.length === 0 && (
-        <p className="mt-2 text-muted">Belum ada job. Picu satu peran di atas.</p>
+      {audit && (
+        <>
+          <CoveragePanel audit={audit} />
+          <SignalsSection signals={audit.node_signals} />
+          <EdgesSection edges={audit.edge_findings} />
+          <DestinationsSection domains={audit.domains_without_destination} />
+        </>
       )}
-      <ul className="mt-3 grid gap-2">
-        {jobs?.map((job) => (
-          <li key={job.id}>
-            <JobRow job={job} onOpen={() => open(job.id)} />
-          </li>
-        ))}
-      </ul>
-
-      {selected && (
-        <JobPanel
-          job={selected}
-          onClose={() => setSelected(null)}
-          onApprove={() => approve(selected.id)}
-          onReject={() => reject(selected.id)}
-        />
-      )}
-
-      <HypothesisTable rows={hypotheses} />
     </Container>
   );
 }
 
-function StatusBar({ status }: { status: IntegrationStatus }) {
+/** Coverage prominan (§7.6): tanpa ini "tak ada temuan" salah terbaca "semuanya sehat",
+ *  padahal dengan n=1 hampir selalu "belum ada datanya". */
+function CoveragePanel({ audit }: { audit: AuditOut }) {
+  const c = audit.coverage;
+  const pctData = c.nodes > 0 ? Math.round((c.nodes_with_cold_data / c.nodes) * 100) : 0;
   return (
-    <Card className="grid gap-1 p-4 text-13">
-      <div>
-        Integrasi:{" "}
-        <strong className={status.enabled ? "text-success" : "text-danger"}>
-          {status.enabled ? "aktif" : "dimatikan"}
-        </strong>{" "}
-        · CLI {status.cli_available ? "terdeteksi" : "tidak ditemukan"} ·{" "}
-        {Object.entries(status.counts)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(" · ") || "belum ada job"}
+    <Card className="mt-2 p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-lg font-semibold">Cakupan data</h2>
+        <span className="font-mono text-[11px] text-subtle">
+          n=1 · telemetri MENANDAI, tak mencabut
+        </span>
       </div>
-      <div className="text-muted">
-        Yang tak pernah dilakukan AI di sini: {status.never_does.join(" · ")}.
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div>
+          <div className="font-mono text-[11px] font-semibold uppercase tracking-wide text-muted">
+            punya data
+          </div>
+          <div className="mt-1 font-mono text-4xl font-bold tabular-nums">
+            {pctData}% <span className="text-base font-normal text-subtle">ada data</span>
+          </div>
+        </div>
+        <div className="min-w-[240px] flex-1">
+          {/* Bar cakupan: porsi solid = sudah punya data dingin; sisanya bergaris =
+              belum diuji (belum ada datanya, bukan "sehat"). */}
+          <div className="flex h-2.5 overflow-hidden rounded-md border border-border-muted bg-surface-muted">
+            {pctData > 0 && (
+              <div className="h-full bg-neutral" style={{ width: `${pctData}%` }} />
+            )}
+            <div className="h-full flex-1" style={{ background: HATCH }} />
+          </div>
+          <p className="mt-2 text-13 text-muted">
+            Baru <strong className="text-fg tabular-nums">{c.nodes_assessable}</strong> dari{" "}
+            <strong className="text-fg tabular-nums">{c.nodes}</strong> node punya cukup
+            attempt dingin (≥{c.min_attempts}) untuk dinilai. Sisanya bukan
+            &quot;sehat&quot; — cuma <strong className="text-fg">belum ada datanya</strong>.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-border-muted pt-2.5 font-mono text-[11px] text-subtle tabular-nums">
+        node total {c.nodes} · punya data dingin {c.nodes_with_cold_data} · bisa dinilai{" "}
+        {c.nodes_assessable} · lapsed sekarang {c.lapsed_now}
       </div>
     </Card>
   );
 }
 
-function TriggerPanel({
-  nodes,
-  disabled,
-  onTrigger,
-}: {
-  nodes: NodeSummary[];
-  disabled: boolean;
-  onTrigger: (fn: () => Promise<AuthoringJob>) => void;
-}) {
-  const [nodeId, setNodeId] = useState("");
-  const [repoPath, setRepoPath] = useState("");
-  const node = nodeId || nodes[0]?.id || "";
+const SIGNAL_META: Record<
+  string,
+  { label: string; tone: BadgeTone; border: string; tint: string }
+> = {
+  trivia: {
+    label: "trivia (lolos-100%-tak-pernah-gagal)",
+    tone: "warning",
+    border: "border-l-warning",
+    tint: "text-warning",
+  },
+  rusak: {
+    label: "rusak (tak pernah lolos)",
+    tone: "danger",
+    border: "border-l-danger",
+    tint: "text-danger",
+  },
+  salah_kalibrasi: {
+    label: "salah kalibrasi (waktu vs estimasi)",
+    tone: "warning",
+    border: "border-l-warning",
+    tint: "text-warning",
+  },
+  probe_mati: {
+    label: "probe mati (daya beda rendah)",
+    tone: "warning",
+    border: "border-l-subtle",
+    tint: "text-subtle",
+  },
+};
 
-  const inputCls =
-    "rounded-md border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none";
-
+function SignalsSection({ signals }: { signals: AuditSignal[] }) {
   return (
-    <section className="mt-6">
-      <h2 className="text-lg font-semibold">Picu peran</h2>
-
-      <Card className="mt-3 grid gap-4 p-4">
-        {/* R3 / R4 — per node */}
-        <div className="grid gap-2">
-          <label className="text-xs font-medium uppercase tracking-wide text-muted">
-            Node sasaran (R3 · R4)
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={node}
-              onChange={(e) => setNodeId(e.target.value)}
-              className={`${inputCls} min-w-[280px] flex-1`}
-            >
-              {nodes.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.id} · {n.concept}
-                </option>
-              ))}
-            </select>
-            <Button
-              variant="secondary"
-              disabled={disabled || !node}
-              onClick={() => onTrigger(() => api.triggerR3({ node_id: node }))}
-            >
-              R3 · materi just-in-time
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={disabled || !node}
-              onClick={() => onTrigger(() => api.triggerR4({ node_id: node }))}
-            >
-              R4 · varian soal baru
-            </Button>
-          </div>
-          <p className="text-13 text-muted">
-            R3 hanya bisa dipicu untuk node yang{" "}
-            <strong className="font-semibold text-fg">punya attempt gagal</strong> — materi
-            lahir dari kegagalan nyata, bukan dibaca lebih dulu.
-          </p>
+    <section className="mt-8">
+      <h2 className="text-lg font-semibold">Node bertanda</h2>
+      {signals.length === 0 ? (
+        <div className="mt-3">
+          {/* Empty ≠ healthy (§7.6 / §9.5). */}
+          <EmptyState icon={<IconAlert size={26} />} title="Belum ada tanda">
+            Dengan satu pelajar ini biasanya berarti <strong className="text-fg">belum cukup
+            data</strong>, bukan <em>semuanya baik</em>. Lihat panel cakupan di atas: node
+            baru bisa dinilai setelah beberapa attempt dingin.
+          </EmptyState>
         </div>
-
-        {/* R2 — dari repo */}
-        <div className="grid gap-2 border-t border-border-muted pt-4">
-          <label className="text-xs font-medium uppercase tracking-wide text-muted">
-            Repo untuk bukti codebase (R2)
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              placeholder="path repo untuk R2 (mis. C:\project\repo-bryant)"
-              value={repoPath}
-              onChange={(e) => setRepoPath(e.target.value)}
-              className={`${inputCls} min-w-[340px] flex-1`}
-            />
-            <Button
-              variant="secondary"
-              disabled={disabled || !repoPath}
-              onClick={() => onTrigger(() => api.triggerR2({ repo_path: repoPath }))}
-            >
-              R2 · bukti codebase (jadi hipotesis)
-            </Button>
-          </div>
-        </div>
-      </Card>
+      ) : (
+        <ul className="mt-3 grid gap-2">
+          {signals.map((s) => (
+            <li key={`${s.node_id}-${s.kind}`}>
+              <SignalRow signal={s} />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
 
-const STATUS_TONE: Record<string, BadgeTone> = {
-  pending: "neutral",
-  running: "info",
-  ready: "success",
-  failed: "danger",
-  approved: "info",
-  rejected: "warning",
-};
-
-function JobRow({ job, onOpen }: { job: AuthoringJob; onOpen: () => void }) {
+function SignalRow({ signal }: { signal: AuditSignal }) {
+  const meta =
+    SIGNAL_META[signal.kind] ??
+    ({ label: signal.kind, tone: "neutral", border: "border-l-subtle", tint: "text-subtle" } as const);
   return (
-    <button onClick={onOpen} className="w-full text-left">
-      <Card className="grid gap-1.5 p-3.5 transition-shadow hover:shadow-md">
-        <div className="flex items-center gap-2">
-          <strong className="uppercase">{job.role}</strong>
-          <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>{job.status}</Badge>
-          <span className="font-mono text-xs text-subtle">{job.id}</span>
+    <Card className={`border-l-4 p-3.5 ${meta.border}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <IconAlert size={18} className={`mt-0.5 shrink-0 ${meta.tint}`} />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="font-mono text-sm font-semibold">{signal.node_id}</code>
+              <Badge tone={meta.tone} variant="outline">
+                {meta.label}
+              </Badge>
+              <span className="font-mono text-xs text-subtle tabular-nums">
+                n={signal.samples}
+              </span>
+            </div>
+            <div className={`mt-1 font-mono text-13 ${meta.tint}`}>{signal.detail}</div>
+          </div>
         </div>
-        <div className="text-13 text-muted">
-          {String(job.request.node_id ?? job.request.repo_path ?? "")}
-          {job.gate && !job.gate.passed && ` · gate: ${job.gate.reason}`}
-          {job.error && ` · ${job.error}`}
-        </div>
-      </Card>
-    </button>
-  );
-}
-
-function JobPanel({
-  job,
-  onClose,
-  onApprove,
-  onReject,
-}: {
-  job: AuthoringJobDetail;
-  onClose: () => void;
-  onApprove: () => void;
-  onReject: () => void;
-}) {
-  const reviewable = job.status === "ready";
-  return (
-    <Card className="mt-6 p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          {job.role.toUpperCase()}
-          <Badge tone={STATUS_TONE[job.status] ?? "neutral"}>{job.status}</Badge>
-        </h2>
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          tutup
-        </Button>
-      </div>
-      <div className="mt-1 font-mono text-xs text-subtle">
-        {job.id} · prompt {job.prompt_version} · percobaan {job.attempts}
-      </div>
-
-      {job.gate && (
-        <p className={`mt-2 text-13 ${job.gate.passed ? "text-success" : "text-danger"}`}>
-          Gate otomatis: {job.gate.reason}
-        </p>
-      )}
-      {job.error && <Banner tone="bad">{job.error}</Banner>}
-
-      {Object.entries(job.existing).length > 0 && (
-        <details className="mt-3">
-          <summary className="cursor-pointer font-medium">
-            Yang sudah ada di data/ (pembanding)
-          </summary>
-          {Object.entries(job.existing).map(([name, content]) => (
-            <FileBlock key={name} name={name} content={content} />
-          ))}
-        </details>
-      )}
-
-      <h3 className="mb-1 mt-4 font-semibold">Artifact</h3>
-      {Object.entries(job.files).map(([name, content]) => (
-        <FileBlock key={name} name={name} content={content} />
-      ))}
-
-      <details className="mt-3">
-        <summary className="cursor-pointer font-medium">Prompt yang dikirim</summary>
-        <FileBlock name="prompt.md" content={job.prompt} />
-      </details>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          variant="primary"
-          onClick={onApprove}
-          disabled={!reviewable}
-          title={reviewable ? "" : "hanya job `ready` yang bisa masuk sistem"}
+        <Link
+          href={`/node/${signal.node_id}`}
+          className="inline-flex shrink-0 items-center gap-1 text-13 font-semibold text-accent hover:underline"
         >
-          Approve → promosikan ke data/
-        </Button>
-        <Button variant="danger" onClick={onReject} disabled={job.status === "approved"}>
-          Tolak
-        </Button>
+          Inspeksi <IconArrowRight size={13} />
+        </Link>
+      </div>
+      {/* Retire di bawah pemisah putus-putus — pending (§7.6). */}
+      <div className="mt-3 flex justify-end border-t border-dashed border-border-muted pt-3">
+        <RetireControl nodeId={signal.node_id} />
       </div>
     </Card>
   );
 }
 
-function FileBlock({ name, content }: { name: string; content: string }) {
+/** ⚠ GAP (§7.6): retire BELUM punya endpoint. Dirancang, ditandai pending — bukan
+ *  tombol yang berpura-pura bekerja (§9.6 "fiction removed"). */
+function RetireControl({ nodeId }: { nodeId: string }) {
   return (
-    <div className="mt-2">
-      <div className="font-mono text-xs text-subtle">{name}</div>
-      <pre className="mt-1 max-h-[320px] overflow-x-auto rounded-md bg-code-bg p-3.5 text-[12.5px] text-code-fg">
-        {content}
-      </pre>
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      <Button
+        variant="danger"
+        size="sm"
+        disabled
+        title="Butuh kapabilitas backend baru: POST /authoring/nodes/{id}/retire"
+      >
+        Pensiunkan node
+      </Button>
+      <span className="font-mono text-[10px] text-subtle" aria-hidden="true">
+        pending · butuh endpoint baru
+      </span>
+      <span className="sr-only">
+        Aksi pensiun untuk {nodeId} belum tersedia — memerlukan endpoint backend baru.
+      </span>
     </div>
   );
 }
 
-const HYPOTHESIS_LABEL: Record<string, string> = {
-  unverified: "belum diverifikasi",
-  confirmed_by_attempt: "dikonfirmasi eksekusi",
-  refuted_by_attempt: "dibantah eksekusi",
+const EDGE_META: Record<string, { label: string; tone: BadgeTone }> = {
+  uncorroborated: { label: "belum terkukuhkan", tone: "warning" },
+  predictive: { label: "prediktif lemah", tone: "warning" },
 };
 
-function HypothesisTable({ rows }: { rows: Hypothesis[] }) {
-  if (rows.length === 0) return null;
+function EdgesSection({ edges }: { edges: AuditEdge[] }) {
+  if (edges.length === 0) return null;
   return (
-    <section className="mt-10">
-      <h2 className="text-lg font-semibold">Hipotesis codebase (R2)</h2>
-      <p className="mt-0.5 text-13 text-muted">
-        Hipotesis <strong className="font-semibold text-fg">tidak pernah</strong> jadi
-        verdict: berapa pun confidence-nya, statusnya hanya berubah lewat attempt
-        reproduksi. Ia boleh mengusulkan urutan, tak boleh menyatakan mastery.
+    <section className="mt-8">
+      <h2 className="text-lg font-semibold">Edge belum terkukuhkan</h2>
+      <p className="mt-0.5 max-w-2xl text-13 text-muted">
+        Laporan, <strong className="text-fg">bukan gerbang</strong> (§7 2026-09-01):
+        ketiadaan bukti konstruk hulu di hilir tak membuktikan edge itu salah. Yang
+        menopang tetap pembatasan akibat — edge usulan AI selalu <code className="font-mono">soft</code>.
       </p>
-      <Card className="mt-3 overflow-x-auto">
-        <table className="w-full border-collapse text-13">
-          <thead>
-            <tr className="border-b border-border text-left text-muted">
-              <th className="px-3 py-2 font-medium">node</th>
-              <th className="px-3 py-2 font-medium">conf.</th>
-              <th className="px-3 py-2 font-medium">status</th>
-              <th className="px-3 py-2 font-medium">bukti</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((h) => (
-              <tr key={h.id} className="border-b border-border-muted last:border-0">
-                <td className="px-3 py-2 font-mono">{h.node_id}</td>
-                <td className="px-3 py-2 tabular-nums">{h.confidence.toFixed(2)}</td>
-                <td className="px-3 py-2">{HYPOTHESIS_LABEL[h.status] ?? h.status}</td>
-                <td className="px-3 py-2 font-mono text-xs">{h.evidence_locator}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
+      <ul className="mt-3 grid gap-2">
+        {edges.map((e) => {
+          const meta = EDGE_META[e.kind] ?? { label: e.kind, tone: "neutral" as BadgeTone };
+          return (
+            <li key={`${e.from_node_id}-${e.to_node_id}-${e.kind}`}>
+              <Card className="flex flex-wrap items-center gap-2 p-3">
+                <code className="font-mono text-13">{e.from_node_id}</code>
+                <span className="text-subtle" aria-hidden="true">→</span>
+                <code className="font-mono text-13">{e.to_node_id}</code>
+                <Badge tone={meta.tone} variant="outline">
+                  {meta.label}
+                </Badge>
+                <span className="text-13 text-muted">{e.reason}</span>
+              </Card>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
 
-function Banner({ tone, children }: { tone: "ok" | "bad"; children: React.ReactNode }) {
+function DestinationsSection({ domains }: { domains: string[] }) {
   return (
-    <p
-      className={`mt-3 rounded-md border px-4 py-2.5 text-13 ${
-        tone === "ok" ? "border-success bg-success-bg text-success" : "border-danger bg-danger-bg text-danger"
-      }`}
-    >
-      {children}
-    </p>
+    <section className="mt-8">
+      <h2 className="text-lg font-semibold">Arah domain (destination)</h2>
+      <p className="mt-0.5 max-w-2xl text-13 text-muted">
+        Satu-satunya keputusan yang <strong className="text-fg">tak bisa</strong> diserahkan
+        ke mesin: &quot;mau jadi apa&quot;. Ditetapkan manusia sekali per domain — bukan per node.
+      </p>
+      {domains.length === 0 ? (
+        <p className="mt-3 text-13 text-muted">Semua domain sudah punya destination.</p>
+      ) : (
+        <ul className="mt-3 grid gap-2">
+          {domains.map((d) => (
+            <li key={d}>
+              <Card className="flex flex-wrap items-center justify-between gap-3 p-3.5">
+                <div className="flex items-center gap-2">
+                  <code className="font-mono text-sm font-semibold">{d}</code>
+                  <Badge tone="warning" variant="outline">
+                    tanpa destination
+                  </Badge>
+                </div>
+                {/* ⚠ GAP (§7.6): set-destination belum punya endpoint. */}
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled
+                    title="Butuh kapabilitas backend baru: PUT /domains/{id}/destination"
+                  >
+                    Tetapkan destination
+                  </Button>
+                  <span className="font-mono text-[10px] text-subtle" aria-hidden="true">
+                    pending · butuh endpoint baru
+                  </span>
+                </div>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

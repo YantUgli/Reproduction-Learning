@@ -61,6 +61,7 @@ export default function PlacementPage() {
   return (
     <Container>
       <PageHeader
+        backLabel="Forge"
         title="Placement — menemukan lantai"
         subtitle="Tantangan turun dari yang paling jauh di hilir ke yang paling primitif. Sesi berhenti di node pertama yang berhasil kamu produksi — itulah lantai awalmu. Gagal di sini bukan kegagalan; justru itu cara lantainya ketemu."
       />

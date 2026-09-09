@@ -104,6 +104,19 @@
   /* Terminal / blok kode & output test */
   --code-bg: #0d1117;
   --code-fg: #e6edf3;
+
+  /* Temper line (brief §8, TANDA TANGAN): gradient dukungan yang MENDINGIN dari ember
+   * (L3, hangat/tersokong) melewati baja ke ink (L0, dingin & telanjang). Endpoint
+   * memakai token --ember/--fg; stop-antara sengaja bespoke (baja transisi, bukan warna
+   * semantik) — hidup di SINI sebagai satu sumber, bukan tersebar sebagai hex di komponen. */
+  --temper-line: linear-gradient(
+    90deg,
+    var(--ember) 0%,
+    #d98a4e 22%,
+    #8b949e 55%,
+    #424a53 80%,
+    var(--fg) 100%
+  );
 }
 
 html {
