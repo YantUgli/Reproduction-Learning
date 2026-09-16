@@ -1,0 +1,15 @@
+id: n014_cookie_param
+domain_id: fastapi
+concept: 'Cookie(): baca satu cookie request sebagai parameter fungsi, kembalikan sebagai JSON'
+description: 'Cookie dibaca lewat parameter fungsi bertanda Cookie(), persis seperti Query() — termasuk default & konversi tipe otomatis. Cookie yang tak disebut di signature tidak pernah dibaca, walau
+  klien mengirimnya.
+
+  '
+grader_type: unit_test
+estimated_minutes: 15
+timebox_seconds: 1200
+status_default: locked
+source_refs:
+  - fastapi_docs_cookie_params
+signature_contract: '@app.get(''<path>'') def f(<name>: <type> = Cookie(default=<d>)) -> dict'
+scaffold_level: L2

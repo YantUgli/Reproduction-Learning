@@ -5,7 +5,8 @@ module: 01-parameter-request
 type: note
 source_refs:
 - fastapi_docs_cookie_params
-node_ids: []
+node_ids:
+- n014_cookie_param
 status: outline
 created: '2026-09-06'
 ---

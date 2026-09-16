@@ -124,3 +124,10 @@ edges:
     type: soft
     source_ref_id: fastapi_docs_dependencies
     note: "Dependency jadi tempat alami menaruh konstrain bersama; urutan ini membuat motifnya jelas."
+
+  # Usul L4 (AI) dari peta Library: library/fastapi-produksi/01-parameter-request/cookie-param.md
+  - from: n004_query_param_default
+    to: n014_cookie_param
+    type: soft
+    source_ref_id: fastapi_docs_cookie_params
+    note: "Usulan L4 — menyarankan urutan, tidak mengunci."

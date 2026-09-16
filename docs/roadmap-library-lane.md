@@ -60,7 +60,7 @@ Diturunkan dari CLAUDE.md §1–§2 + dua penjaga brainstorm:
 | **L1** | `course-intake` | tidak | nol mastery | L0 |
 | **L2** | `note-refine` | tidak (AI = editor) | nol mastery | L1 |
 | **L3** | `learn-intake` + grounding ✅ | **ya** | §8 (content library) | L2 |
-| **L4** | Jembatan Library→Forge | ya (usul node) | pakai gate M5/M7 | L3 |
+| **L4** | Jembatan Library→Forge ✅ | ya (usul node) | pakai gate M5/M7 | L3 |
 | **L5** | Penjaga metrik (dashboard) ✅ | — | **wajib sebelum "selesai"** | L4 |
 
 **Urutan tidak boleh dibalik.** Tiap fase memasang penjaga sebelum fase berikutnya
@@ -156,14 +156,37 @@ menambah risiko.
 - **Test:** 185 backend hijau (naik dari 151 — +24 `test_node_genesis`, +9
   `test_promote_node` yang merupakan **test promosi pertama di repo**) dan 62 scripts
   hijau (+9 untuk `--link`/`--candidates`).
-- ⏳ **Acceptance BELUM terpenuhi penuh:** seluruh uji penolakan, kill switch, dan jalur
-  L3→L4 terbukti live, tapi **belum ada node sungguhan yang lahir** — panggilan CLI
-  ketiga dibalas `HTTP 429` (kuota sesi habis), bukan ditolak gerbang. Selama tiga job
-  smoke, `git status data/` tetap bersih. Cara menuntaskannya (tanpa perubahan kode) ada
-  di [`execution-plan-L4-library-forge-bridge.md`](execution-plan-L4-library-forge-bridge.md) §15.
-- **Ditemukan smoke:** `r4_node.md` tak mendaftar skema `ProbeYaml` utuh, jadi dua
-  artifact lahir tanpa `node_id`/`type` dan **ditolak kontrak** — promptnya yang cacat,
-  bukan gerbangnya. Sudah diperbaiki.
+- **Ditemukan smoke 2026-09-06:** `r4_node.md` tak mendaftar skema `ProbeYaml` utuh, jadi
+  dua artifact lahir tanpa `node_id`/`type` dan **ditolak kontrak** — promptnya yang cacat,
+  bukan gerbangnya. Sudah diperbaiki. Percobaan ketiga terhenti di `HTTP 429` (kuota sesi
+  CLI habis), bukan gerbang — `git status data/` tetap bersih sepanjang tiga job itu.
+- ✅ **L4 acceptance: TERBUKTI (2026-09-16).** Kandidat
+  `library/fastapi-produksi/01-parameter-request/cookie-param.md` ditempa lewat
+  `POST /authoring/node` sungguhan (job `r4-20260916T104348-eb79be`, prompt yang sudah
+  diperbaiki, tanpa mengakali gerbang apa pun):
+  - Job selesai `approved` di percobaan pertama — triad **kedua** varian hijau
+    (referensi hijau, kosong & starter merah) + probe `n014_probe_01` terverifikasi
+    eksekusi. `data/domains/fastapi/nodes/n014_cookie_param/` lahir lengkap (2 varian +
+    1 probe + `node.yaml`), plus satu edge `soft` baru (`n004_query_param_default` →
+    `n014_cookie_param`) di-append ke `edges.yaml` (komentar kurasi lama utuh).
+  - **Diverifikasi independen** dari gate job itu sendiri: `scripts/verify_nodes.py
+    fastapi` (gerbang authoring resmi) → **29/29 instance lolos, 14/14 probe
+    terverifikasi** (13 node lama + `n014_cookie_param`).
+  - `scripts/verify_library.py --link ... --node n014_cookie_param` menautkan balik
+    (`node_ids` terisi, `status` catatan **tak berubah** — masih `outline`, sesuai desain).
+  - **Dibuktikan bisa dikerjakan dari jalur yang sama seperti Bryant**, bukan cuma "ada di
+    DB": `GET /nodes/n014_cookie_param` → `status: available` (bukan `locked` — edge
+    `soft` tak mengunci apa pun), level `L3/L2/L1/L0` semua tersedia; `POST /attempts`
+    dengan solusi cookie sungguhan di level `L0` (varian `variant_b`, instance
+    `n014_cookie_param__variant_b`) → **`result: pass`**, `mode: verification`, hidden
+    test benar-benar dieksekusi via `SubprocessExecutor` (4 test lolos, bukan simulasi).
+  - `GET /library/progress` untuk `fastapi-produksi` berubah dari **1 materi
+    `unmapped` (lubang)** menjadi **`reproduced: 1/1` (100%)** — lubang yang dicatat L5
+    2026-09-06 sekarang tertutup oleh eksekusi kode sungguhan, bukan oleh pembacaan.
+  - **Gerbang 403 tak tersentuh dan tetap berfungsi**: `GET
+    /nodes/n014_cookie_param/explanation` tetap balas `403` sesudah attempt yang LOLOS
+    ini (aturan lama: 403 sampai ada attempt **gagal** — Amandemen A §7 CLAUDE.md belum
+    diimplementasikan, dan memang tidak disentuh di langkah ini).
 
 ### L5 — Penjaga metrik (kunci anti-"Dicoding jilid 2")
 - Dashboard hitung **"% direproduksi", bukan "% dibaca"**. Course tampil *belum
@@ -236,7 +259,8 @@ menambah risiko.
   `type: roadmap`, dan batas "peta vs bab" dibuat mekanis (dilarang blok kode + batas
   prosa 3000 karakter). Urutan build: **gerbang dulu, penulisnya belakangan** — diikuti
   apa adanya saat eksekusi.
-- ▶️ **L4 (jembatan Library→Forge) — plan eksekusi SIAP, belum dikerjakan** (2026-09-06):
+- ✅ **L4 (jembatan Library→Forge) SELESAI & ACCEPTANCE TERBUKTI** (plan dikunci
+  2026-09-06, dituntaskan 2026-09-16):
   [`execution-plan-L4-library-forge-bridge.md`](execution-plan-L4-library-forge-bridge.md).
   Temuan yang membentuknya: pipeline R4 tak bisa melahirkan node (lihat koreksi di §3/L4);
   Isyah memilih **memperluas R4 dengan mode `node`** ketimbang menambah peran R5. 11
@@ -244,7 +268,10 @@ menambah risiko.
   **mesin**, node lahir **lengkap atau tidak sama sekali** (≥2 varian + 1 probe), gerbang =
   **triad per varian** + probe dieksekusi + kutipan verbatim, edge hasil AI **selalu
   `soft`**, `edges.yaml` ditambahi lewat **append teks** (komentar kurasi tak boleh hilang),
-  dan tautan balik `node_ids` ditulis **script**, bukan AI.
+  dan tautan balik `node_ids` ditulis **script**, bukan AI. Item terakhir yang terblokir
+  kuota (2026-09-06) dituntaskan 2026-09-16: `n014_cookie_param` lahir sungguhan, lolos
+  gerbang authoring independen, dan terbukti bisa dikerjakan (`POST /attempts` → pass) —
+  detail bukti di §3/L4 di atas.
 - ✅ **L5 (penjaga metrik) SELESAI** (2026-09-06) —
   [`execution-plan-L5-metric-guard.md`](execution-plan-L5-metric-guard.md). 10 keputusan
   dikunci; yang menentukan: "direproduksi" = pernah lolos **attempt mode dingin** (definisi
@@ -255,6 +282,7 @@ menambah risiko.
   `library/` & DB nyata: `fastapi-dasar` 4 materi, `fastapi-produksi` **1 materi berlubang**
   (buah dari acceptance L4 yang belum tuntas — tampil sebagai lubang, bukan disembunyikan).
   Hasil eksekusi & bukti test ada di §3/L5 di atas.
-- ⏭️ **Sesudah L5:** menuntaskan acceptance L4 (satu node sungguhan lahir) dan sisa **M7**
-  (meja audit + tombol pensiun + `destination`). Peringatan §4 berhenti berlaku begitu L5
-  hijau — sejak titik itu, kenyamanan tak bisa lagi menyamar jadi kemajuan.
+- ⏭️ **Sesudah L4 & L5:** sisa **M7** (meja audit + tombol pensiun + `destination`), lalu
+  mekanisme review async (Amandemen C, §7 CLAUDE.md 2026-09-16) sebelum edge `hard` dari
+  AI (Amandemen B) boleh aktif. Peringatan §4 berhenti berlaku begitu L5 hijau — sejak
+  titik itu, kenyamanan tak bisa lagi menyamar jadi kemajuan.

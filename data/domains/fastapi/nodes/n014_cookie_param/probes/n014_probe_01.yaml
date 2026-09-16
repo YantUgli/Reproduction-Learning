@@ -1,0 +1,16 @@
+id: n014_probe_01
+node_id: n014_cookie_param
+type: predict_output
+question: 'Route ini dipanggil dengan cookie `cart_count=7`. Apa isi JSON responsnya?
+
+  '
+options:
+  - '{''cart_count'': ''7''}'
+  - '{''cart_count'': 7}'
+  - '{''cart_count'': 0}'
+  - '{''cart_count'': None}'
+correct_answer: '{''cart_count'': 7}'
+snippet: "from fastapi import Cookie, FastAPI\nfrom fastapi.testclient import TestClient\n\napp = FastAPI()\n\n\n@app.get(\"/cart\")\ndef read_cart(cart_count: int = Cookie(default=0)):\n    return {\"\
+  cart_count\": cart_count}\n\n\nclient = TestClient(app)\nresponse = client.get(\"/cart\", cookies={\"cart_count\": \"7\"})\n"
+expression: response.json()
+expected_value: ''

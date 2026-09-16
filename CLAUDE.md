@@ -892,3 +892,88 @@ alasan · alternatif yang ditolak.
   akan membuat Bryant berhenti memakainya; yang bertugas meneriakkannya
   `scripts/verify_library.py`, gerbang commit); (v) grafik tren/streak/lencana — semuanya
   membuat angka terasa enak tanpa menambah satu pun bukti reproduksi.
+
+- **2026-09-16 · AMANDEMEN A · Gerbang 403 dilonggarkan KHUSUS untuk node yang belum
+  pernah punya Attempt sama sekali (bukan node lama tanpa attempt gagal).** Membalik
+  sebagian keputusan M5 2026-08-22 ("materi lahir dari kegagalan nyata atau tidak sama
+  sekali") untuk satu kasus sempit: topik yang baru saja lahir sebagai node (lewat L4/
+  forge-node) tidak mungkin punya attempt gagal, karena soalnya sendiri belum pernah ada
+  sebelum node itu dibuat — mensyaratkan kegagalan lebih dulu berarti memaksa Bryant
+  mengerjakan soal placeholder cuma untuk dianggap "gagal", dan itu friction buatan yang
+  tidak mendidik.
+
+  **Aturan presis:** `GET /nodes/{id}/explanation` (dan syarat trigger `jobs.trigger_r3`)
+  terbuka bila **(a)** ada attempt gagal untuk node itu (aturan lama, tak berubah), **atau**
+  **(b)** node itu **belum punya Attempt sama sekali** — nol baris di tabel `Attempt` untuk
+  `node_id` tsb, apa pun mode-nya (placement/acquisition/verification/review). Begitu
+  attempt PERTAMA tercatat — lolos ATAU gagal — node itu permanen kembali ke aturan lama
+  (hanya terbuka sesudah attempt gagal). Materi yang sempat terlihat sebelum attempt
+  pertama tidak "ditarik kembali" secara retroaktif dari sisi Bryant (itu di luar kendali
+  sistem), tapi panggilan API sesudahnya mengikuti status attempt yang sudah ada.
+
+  **Batasan:** hanya berlaku untuk node BARU (zero attempts). Node yang sudah pernah
+  dicoba — termasuk yang seluruh attempt-nya lolos tanpa pernah gagal — tetap 403 sampai
+  ada attempt gagal, tanpa pengecualian.
+
+  **Konsekuensi implementasi (dicatat, belum dikerjakan):** dua titik kode perlu berubah
+  bersamaan — `routers/nodes.py` (cek 403) dan `claude/jobs.py::trigger_r3` (cek
+  `_failed_attempt`) — keduanya harus memakai definisi gerbang yang SAMA (fungsi bersama,
+  bukan dua salinan aturan; preseden: `grounding.py` dipakai bersama R3/L3/L4 justru untuk
+  menghindari dua gerbang yang diam-diam menyimpang).
+
+  *Ditolak:* memaksa attempt gagal dengan soal placeholder/dummy dulu sebelum materi boleh
+  tampil — dianggap friction buatan, bukan pedagogi; tidak menutup celah apa pun karena
+  hasil "gagal"-nya bisa diprediksi dan tidak mencerminkan usaha nyata.
+
+- **2026-09-16 · AMANDEMEN B · PRD §5.1 direvisi: AI boleh mengusulkan `hard` edge
+  sebagai keputusan awal, bukan hanya `soft`.** Membalik dua keputusan sebelumnya:
+  2026-09-01 ("edge usulan AI hanya boleh `soft` — hanya `hard` yang mengikat urutan")
+  dan konsekuensinya di L4 KUNCI (g) 2026-09-06 ("edge hasil L4 selalu `soft` dan
+  opsional"). Ini JUGA mengubah teks PRD §5.1 ("Isyah yang prune dan menandai hard/soft")
+  dan menyentuh guardrail §8 ("AI menentukan learning path/urutan" ditolak) — **bukan**
+  sekadar catatan alur kerja, melainkan amandemen invariant.
+
+  **Model baru:** AI boleh menghasilkan urutan/prasyarat (termasuk usulan `hard`) sebagai
+  keputusan awal, bukan cuma saran `soft`. Hasilnya masuk antrian review ASYNC (mekanisme
+  dirancang di Amandemen C) — TIDAK langsung dipromosikan. Isyah mereview kapan saja;
+  bila TIDAK diveto dalam **7 hari kalender** sejak masuk antrian, dianggap disetujui dan
+  boleh dipromosikan jadi `hard` sungguhan.
+
+  **Batasan yang TIDAK berubah:** Isyah tetap **satu-satunya** yang bisa veto — tidak ada
+  pihak lain, tidak ada mekanisme auto-veto dari sinyal telemetri. Sistem **tidak boleh**
+  mempromosikan `hard` tanpa melalui antrian ini — artinya Amandemen B **tidak aktif
+  secara praktis** sampai mekanisme Amandemen C benar-benar dibangun dan dipasang di
+  depan jalur promosi; sampai saat itu, `_append_soft_edge` (L4) tetap satu-satunya jalur
+  penulisan edge dari AI, dan tetap selalu `soft`, persis seperti sekarang.
+
+  **Alasan:** volume node yang direncanakan datang dari pipeline batch (Kebutuhan 1/2)
+  membuat model "Isyah aktif approve tiap edge satu-satu" (opt-in) tidak skalabel; opt-out
+  veto memindahkan beban ke Isyah hanya saat ia keberatan, bukan di tiap kejadian.
+
+  **Catatan risiko yang disadari, belum diselesaikan:** PRD §5.1/§8 sebagai FILE masih
+  berbunyi seperti versi lama (Isyah menandai hard/soft secara aktif; AI tak menentukan
+  urutan) — CLAUDE.md menyatakan invariant menang bila ada konflik, tapi di sini KEDUANYA
+  adalah dokumen keputusan resmi yang kini saling berbeda kata. Menyimpan celah ini hanya
+  di CLAUDE.md §7 (tanpa penanda apa pun di PRD) berisiko jadi dua sumber kebenaran yang
+  sama persis dengan pola yang berulang kali ditolak di repo ini (job state file vs DB,
+  toleransi ML di `data/` vs kolom DB). **Rekomendasi:** PRD §5.1 diberi satu baris penunjuk
+  ("diamandemen — lihat CLAUDE.md §7 2026-09-16 Amandemen B") pada kesempatan berikutnya
+  PRD disentuh, meski instruksi saat ini membatasi perubahan ke CLAUDE.md saja.
+
+  *Ditolak:* tetap soft-only dari AI + Isyah hand-promote manual via edit `edges.yaml`
+  (pola yang sudah berjalan hari ini) — dianggap tidak skalabel untuk volume node dari
+  pipeline batch mendatang.
+
+- **2026-09-16 · AMANDEMEN C · Sistem butuh mode review ASYNC ketiga, di luar dua mode
+  yang ada sekarang (sinkron-dalam-sesi, atau auto-promote tanpa review).** Dicatat
+  sebagai KEPUTUSAN UNTUK MERANCANG, bukan keputusan teknis final — rancangan mekanisme
+  (tempat state disimpan, cara Isyah melihat & memveto, perilaku saat timeout) didokumentasikan
+  terpisah setelah L4 end-to-end terbukti (lihat roadmap-library-lane.md), sebelum satu
+  baris kode implementasi pun ditulis. Amandemen B bergantung penuh pada mekanisme ini —
+  tidak ada `hard` edge yang boleh dipromosikan AI sebelum mekanisme ini ada dan terpasang
+  di depan jalur promosi.
+
+  *Ditolak:* memperluas `CLAUDE_AUTO_PROMOTE=0` (mode sinkron `ready`→approve manual) apa
+  adanya untuk kasus ini — mode itu mengasumsikan Isyah menunggu di sesi yang sama; yang
+  dibutuhkan adalah job yang boleh "selesai lalu tidur" menunggu veto yang bisa datang
+  hari lain, state yang berbeda dari `ready` biasa.
