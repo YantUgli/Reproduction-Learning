@@ -1432,10 +1432,10 @@ backend/.venv/Scripts/python.exe scripts/verify_library.py
 
 ---
 
-## 15. Definition of Done (checklist) — 11/12 TERBUKTI 2026-09-06 · 1 TERBLOKIR KUOTA
+## 15. Definition of Done (checklist) — 12/12 TERBUKTI · item terakhir tuntas 2026-09-16
 
 > Dieksekusi 2026-09-06. Kolom bukti diisi dari run nyata, bukan dari niat.
-> **Satu item belum bisa dibuktikan** dan sebabnya di luar kode — lihat catatan di bawah.
+> Satu item dulu terblokir kuota CLI (di luar kode); **TUNTAS 2026-09-16** — lihat catatan di bawah.
 
 - [x] `NodeGenesisArtifact` + `load_node_genesis` + `_require_identity` ada; aturan hidden
       test **satu salinan** (dipakai R4 varian & node).
@@ -1457,13 +1457,15 @@ backend/.venv/Scripts/python.exe scripts/verify_library.py
 - [x] `ruff` bersih — persis 3 temuan lama (1×UP017 + 2×E402), nol temuan baru.
       **Catatan invokasi:** jalankan dari `backend/`; dari repo root tak ada
       `pyproject.toml` sehingga ruff memakai aturan default (lihat plan L3 §12).
-- [~] Smoke §14 — **sebagian**: seluruh uji PENOLAKAN terbukti live (empat, satu lebih
-      banyak dari rencana), jalur L3→L4 terbukti, kill switch terbukti. Yang belum:
-      baris-baris yang menuntut job SUKSES (folder node, `edges.yaml`, `verify_nodes.py`,
-      `--link`, tampil `available`) — semuanya hilir dari item berikut.
-- [ ] **TERBLOKIR:** satu node sungguhan lahir dari peta Library dan lolos
-      `verify_nodes.py`. Sebabnya **bukan gerbang dan bukan kode**: panggilan CLI ketiga
-      dibalas `HTTP 429 — "You've hit your session limit"`. Lihat catatan di bawah.
+- [x] Smoke §14 — **lengkap**: seluruh uji PENOLAKAN terbukti live (empat, satu lebih
+      banyak dari rencana), jalur L3→L4 terbukti, kill switch terbukti. Baris-baris yang
+      menuntut job SUKSES (folder node, `edges.yaml`, `verify_nodes.py`, `--link`, tampil
+      `available`) TERBUKTI 2026-09-16 lewat `n014_cookie_param` (job
+      `r4-20260916T104348-eb79be`).
+- [x] Satu node sungguhan lahir dari peta Library dan lolos `verify_nodes.py`.
+      → TUNTAS 2026-09-16 (dulu terblokir `HTTP 429`, bukan gerbang/kode): `n014_cookie_param`
+      lahir dari job `r4-20260916T104348-eb79be`, `verify_nodes.py` **29/29**, `--link`
+      menulis `node_ids`, dan frontend lolos.
 - [x] Entri §7 CLAUDE.md ditulis; roadmap & §6 CLAUDE.md diperbarui.
 - [x] **Invariant utuh:** tak ada verdict mastery dari AI; edge baru semuanya `soft`;
       `status` materi Library tak tersentuh; `data/` hanya berubah lewat promosi yang
