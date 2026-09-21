@@ -36,6 +36,7 @@ from pathlib import Path
 import yaml
 from sqlmodel import Session, select
 
+from app import config
 from app.claude import contracts
 from app.claude.artifacts import Job, JobStatus, Role, new_job, read_job, save_job, set_status
 from app.claude.prompts import render
@@ -204,6 +205,7 @@ def trigger_r4_node(
     concept: str,
     source_ref_id: str,
     prereq_node_id: str | None = None,
+    edge_type: str = "soft",
 ) -> Job:
     """NODE BARU dari satu entri peta Library (L4).
 
@@ -254,6 +256,13 @@ def trigger_r4_node(
     probe_id = _probe_id_for(node_id, 1)
     labels = ["variant_a", "variant_b"]
 
+    # KLAMP Amandemen B (A1): edge `hard` dari AI hanya mengalir bila flag menyala.
+    # Diperiksa DI SINI, titik kelahiran `job.request`, jadi `edge_type == "hard"` tak
+    # pernah tersimpan selama flag off — tak peduli pemanggilnya (router/test/offline).
+    # Sampai lajur pending + veto + audit terbukti dan flag dinyalakan sadar, L4 selalu
+    # `soft`. (§7 2026-09-16 Amandemen B/C.)
+    effective_edge_type = edge_type if config.AMENDMENT_B_ENABLED else "soft"
+
     prompt = render(
         "r4_node",
         {
@@ -288,6 +297,7 @@ def trigger_r4_node(
             "source_ref_id": source_ref_id,
             "library_file": material,
             "prereq_node_id": prereq_node_id or "",
+            "edge_type": effective_edge_type,
             "variant_labels": labels,
             "probe_id": probe_id,
         },

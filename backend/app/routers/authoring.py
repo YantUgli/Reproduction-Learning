@@ -21,7 +21,7 @@ from app.claude.runner import cli_available
 from app.config import CLAUDE_INTEGRATION_ENABLED, DATA_DIR
 from app.db import engine, get_session
 from app.models import Domain, HypothesisStatus
-from app.services import edge_evidence, telemetry
+from app.services import edge_evidence, pending_edges, telemetry
 from app.services.hypotheses import list_hypotheses
 
 router = APIRouter(prefix="/authoring", tags=["authoring"])
@@ -79,6 +79,10 @@ class TriggerNodeIn(BaseModel):
     concept: str
     source_ref_id: str
     prereq_node_id: str | None = None
+    # Amandemen B (§7 2026-09-16): usulan `hard` masuk antrian veto 7 hari, bukan langsung
+    # mengunci. Pintu HTTP-nya ada di sini, TAPI `jobs.trigger_r4_node` mengklamp ke `soft`
+    # selama `AMENDMENT_B_ENABLED` off — jadi field ini tak berefek sampai flag dinyalakan.
+    edge_type: str = "soft"
 
 
 class TriggerR2In(BaseModel):
@@ -196,6 +200,7 @@ def trigger_node(
             concept=body.concept,
             source_ref_id=body.source_ref_id,
             prereq_node_id=body.prereq_node_id,
+            edge_type=body.edge_type,
         )
     except jobs.JobError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
@@ -337,6 +342,22 @@ class AuditEdge(BaseModel):
     reason: str
 
 
+class PendingEdgeOut(BaseModel):
+    # Usulan edge `hard` yang menunggu veto Isyah (Amandemen C / lajur ASYNC). Ia hidup
+    # di `edges.pending.yaml`, TAK PERNAH di `edges.yaml` — jadi loop buta terhadapnya
+    # dan node tetap `available` selama edge menunggu.
+    from_node_id: str
+    to_node_id: str
+    domain_id: str
+    library_file: str
+    job_id: str
+    source_ref_id: str
+    state: str  # "menunggu" | "matang" | "diveto"
+    queued_at: str
+    matures_at: str
+    veto_reason: str  # "" bila belum diveto
+
+
 class AuditOut(BaseModel):
     # Seberapa banyak kurikulum yang PUNYA data untuk dinilai. Tanpa angka ini,
     # "tak ada temuan" mudah dibaca sebagai "semuanya sehat", padahal dengan satu
@@ -344,6 +365,10 @@ class AuditOut(BaseModel):
     coverage: dict
     node_signals: list[AuditSignal]
     edge_findings: list[AuditEdge]
+    # Usulan edge `hard` menunggu veto + berapa yang siap dipromosikan (matang, tak diveto).
+    # Promosi sendiri lewat script manual (`promote_pending_edges.py`), bukan endpoint ini.
+    pending_edges: list[PendingEdgeOut]
+    ready_to_promote: int
     # Satu-satunya hal di M7 yang memang menunggu manusia: arah kurikulum per domain.
     # Tak ada oracle untuk "apakah ini kurikulum yang benar" — di sistem mana pun.
     domains_without_destination: list[str]
@@ -352,6 +377,7 @@ class AuditOut(BaseModel):
 @router.get("/audit", response_model=AuditOut)
 def audit(session: Session = Depends(get_session)) -> AuditOut:
     edges = edge_evidence.corroboration(session) + edge_evidence.predictive_evidence(session)
+    pending, ready = _pending_edges_for_audit()
     return AuditOut(
         coverage=telemetry.coverage(session),
         node_signals=[
@@ -368,8 +394,43 @@ def audit(session: Session = Depends(get_session)) -> AuditOut:
             for f in edges
             if f.kind != "corroborated"
         ],
+        pending_edges=pending,
+        ready_to_promote=ready,
         domains_without_destination=_domains_without_destination(session),
     )
+
+
+def _pending_edges_for_audit() -> tuple[list[PendingEdgeOut], int]:
+    """Baca semua `edges.pending.yaml` lintas domain + hitung berapa yang matang.
+
+    READ-only secara STRUKTURAL, bukan sekadar disiplin: `app.services.pending_edges`
+    tak punya satu fungsi tulis pun (penulisan sengaja hidup di `promote_pending_edges.py`,
+    sebuah script terpisah — Amandemen C). Jadi jalur audit ini tak bisa menyentuh disk
+    walau salah dipakai.
+    """
+    out: list[PendingEdgeOut] = []
+    ready = 0
+    for path in sorted((DATA_DIR / "domains").glob("*/edges.pending.yaml")):
+        domain_id = path.parent.name
+        for entry in pending_edges.load_pending(path):
+            st = pending_edges.state(entry)
+            if st == pending_edges.STATE_MATANG:
+                ready += 1
+            out.append(
+                PendingEdgeOut(
+                    from_node_id=entry.from_,
+                    to_node_id=entry.to,
+                    domain_id=domain_id,
+                    library_file=entry.library_file,
+                    job_id=entry.job_id,
+                    source_ref_id=entry.source_ref_id,
+                    state=st,
+                    queued_at=entry.queued_at.isoformat(),
+                    matures_at=pending_edges.matures_at(entry).isoformat(),
+                    veto_reason=entry.veto_reason,
+                )
+            )
+    return out, ready
 
 
 def _domains_without_destination(session: Session) -> list[str]:

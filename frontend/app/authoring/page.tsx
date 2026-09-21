@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, type AuditEdge, type AuditOut, type AuditSignal } from "../../lib/api";
+import {
+  api,
+  type AuditEdge,
+  type AuditOut,
+  type AuditSignal,
+  type PendingEdgeOut,
+} from "../../lib/api";
 import Container from "../components/ui/Container";
 import PageHeader from "../components/ui/PageHeader";
 import Card from "../components/ui/Card";
@@ -10,7 +16,7 @@ import Button from "../components/ui/Button";
 import Badge, { type BadgeTone } from "../components/ui/Badge";
 import EmptyState from "../components/ui/EmptyState";
 import ErrorState from "../components/ui/ErrorState";
-import { IconAlert, IconArrowRight } from "../components/ui/Icon";
+import { IconAlert, IconArrowRight, IconClock } from "../components/ui/Icon";
 import AuthoringNav from "./AuthoringNav";
 
 // Hatch "belum ada data" — bagian kurikulum yang belum diuji dingin. Sama pola dengan
@@ -60,6 +66,10 @@ export default function AuditDeskPage() {
           <CoveragePanel audit={audit} />
           <SignalsSection signals={audit.node_signals} />
           <EdgesSection edges={audit.edge_findings} />
+          <PendingEdgesSection
+            edges={audit.pending_edges}
+            readyToPromote={audit.ready_to_promote}
+          />
           <DestinationsSection domains={audit.domains_without_destination} />
         </>
       )}
@@ -266,6 +276,132 @@ function EdgesSection({ edges }: { edges: AuditEdge[] }) {
         })}
       </ul>
     </section>
+  );
+}
+
+const PENDING_STATE_META: Record<
+  PendingEdgeOut["state"],
+  { label: string; tone: BadgeTone }
+> = {
+  menunggu: { label: "menunggu", tone: "neutral" },
+  matang: { label: "matang · siap promosi", tone: "warning" },
+  diveto: { label: "diveto", tone: "danger" },
+};
+
+/** Hitung mundur jatuh tempo (statis — halaman ini load-sekali, tak live-ticking). */
+function maturityLabel(edge: PendingEdgeOut): string {
+  if (edge.state === "diveto") return "diveto — tak akan dipromosikan";
+  const ms = new Date(edge.matures_at).getTime() - Date.now();
+  const days = Math.round(ms / 86_400_000);
+  if (ms <= 0) return `matang sejak ${Math.abs(days)} hari lalu`;
+  return `matang dalam ${days} hari`;
+}
+
+/**
+ * Edge `hard` menunggu veto (Amandemen C). Sengaja BUKAN gerbang blokir: usulan hidup di
+ * `edges.pending.yaml` (bukan `edges.yaml`), jadi loop tak pernah membacanya dan node tak
+ * pernah terkunci selama menunggu. Veto & promosi keduanya lewat script manual — halaman
+ * ini read-only, memberi perintah tempel (pola retire/set-destination yang sudah ada).
+ */
+function PendingEdgesSection({
+  edges,
+  readyToPromote,
+}: {
+  edges: PendingEdgeOut[];
+  readyToPromote: number;
+}) {
+  return (
+    <section className="mt-8">
+      <h2 className="text-lg font-semibold">Edge hard menunggu veto</h2>
+      <p className="mt-0.5 max-w-2xl text-13 text-muted">
+        Usulan edge <code className="font-mono">hard</code> dari AI (Amandemen B) tak
+        langsung mengunci urutan: ia menunggu <strong className="text-fg">7 hari</strong> di{" "}
+        <code className="font-mono">edges.pending.yaml</code>, dan Isyah bisa memveto kapan
+        saja. Loop <strong className="text-fg">tak pernah</strong> membaca antrian ini —
+        node tetap <code className="font-mono">available</code> selama edge menunggu.
+      </p>
+
+      {readyToPromote > 0 && <PromoteReminder count={readyToPromote} />}
+
+      {edges.length === 0 ? (
+        <div className="mt-3">
+          <EmptyState icon={<IconClock size={26} />} title="Antrian kosong">
+            Ini <strong className="text-fg">normal</strong>: sampai Amandemen B diaktifkan,
+            usulan AI selalu <code className="font-mono">soft</code> dan mendarat langsung di{" "}
+            <code className="font-mono">edges.yaml</code> — tak ada yang lewat antrian veto.
+          </EmptyState>
+        </div>
+      ) : (
+        <ul className="mt-3 grid gap-2">
+          {edges.map((e) => (
+            <li key={`${e.from_node_id}-${e.to_node_id}`}>
+              <PendingEdgeRow edge={e} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Pengingat "X siap promosi" — hanya saat ada yang matang. `--dry-run` duluan (pratinjau
+ *  sebelum gerbang, pola `verify_library.py --candidates`). */
+function PromoteReminder({ count }: { count: number }) {
+  return (
+    <Card className="mt-3 border-l-4 border-l-warning p-3.5">
+      <div className="flex items-start gap-3">
+        <IconClock size={18} className="mt-0.5 shrink-0 text-warning" />
+        <div className="min-w-0">
+          <div className="text-13 font-semibold text-fg">
+            {count} edge siap dipromosikan{" "}
+            <span className="font-normal text-muted">(matang, tak diveto)</span>
+          </div>
+          <p className="mt-0.5 text-13 text-muted">
+            Pratinjau dulu, lalu jalankan. Promosi ini menulis <code className="font-mono">hard</code>{" "}
+            ke <code className="font-mono">edges.yaml</code> — jalankan di terminal:
+          </p>
+          <pre className="mt-2 overflow-x-auto rounded-md bg-code-bg p-3 text-[12.5px] text-code-fg">
+            python scripts/promote_pending_edges.py --dry-run{"\n"}
+            python scripts/promote_pending_edges.py
+          </pre>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PendingEdgeRow({ edge }: { edge: PendingEdgeOut }) {
+  const meta = PENDING_STATE_META[edge.state];
+  const vetoCmd = `python scripts/promote_pending_edges.py --veto ${edge.from_node_id}__${edge.to_node_id} --reason "..."`;
+  return (
+    <Card className="p-3.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <code className="font-mono text-13">{edge.from_node_id}</code>
+        <span className="text-subtle" aria-hidden="true">→</span>
+        <code className="font-mono text-13">{edge.to_node_id}</code>
+        <Badge tone={meta.tone} variant="outline">
+          {meta.label}
+        </Badge>
+        <span className="font-mono text-xs text-subtle tabular-nums">{maturityLabel(edge)}</span>
+        <span className="ml-auto font-mono text-[11px] text-subtle">{edge.domain_id}</span>
+      </div>
+      <div className="mt-1.5 truncate text-13 text-muted" title={edge.library_file}>
+        {edge.library_file}
+      </div>
+      {edge.state === "diveto" && edge.veto_reason && (
+        <div className="mt-1 text-13 text-danger">alasan veto: {edge.veto_reason}</div>
+      )}
+      {edge.state !== "diveto" && (
+        <div className="mt-3 border-t border-dashed border-border-muted pt-3">
+          <div className="font-mono text-[10px] uppercase tracking-wide text-subtle">
+            veto (isi alasan, lalu jalankan di terminal)
+          </div>
+          <pre className="mt-1 overflow-x-auto rounded-md bg-code-bg p-3 text-[12.5px] text-code-fg">
+            {vetoCmd}
+          </pre>
+        </div>
+      )}
+    </Card>
   );
 }
 

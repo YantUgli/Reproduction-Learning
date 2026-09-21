@@ -977,3 +977,59 @@ alasan · alternatif yang ditolak.
   adanya untuk kasus ini — mode itu mengasumsikan Isyah menunggu di sesi yang sama; yang
   dibutuhkan adalah job yang boleh "selesai lalu tidur" menunggu veto yang bisa datang
   hari lain, state yang berbeda dari `ready` biasa.
+
+- **2026-09-21 · AMANDEMEN B/C · Lajur review ASYNC (pending-hard-edge) SELESAI
+  diimplementasi; Amandemen B siap tapi tetap di belakang flag `REPRO_AMENDMENT_B`
+  (default OFF, belum diaktifkan di lingkungan mana pun).** Menuntaskan "keputusan untuk
+  merancang" Amandemen C (2026-09-16) dan mengaktifkan-secara-kode Amandemen B — tanpa
+  menyalakannya. Rancangan: `docs/design-async-review-mechanism.md`; langkah:
+  `docs/execution-plan-async-review.md`.
+
+  **Yang terpasang** (semua gerbang mesin, tak ada approve manusia di jalur kelahiran):
+  (1) store `data/domains/<domain>/edges.pending.yaml` + reader READ-only
+  `services/pending_edges.py` (`edge_id`, `state` menunggu/matang/diveto, klok
+  `queued_at + 7d`); loop TERBUKTI buta terhadapnya (test regresi) — node tetap
+  `available` selama edge menunggu. (2) `scripts/promote_pending_edges.py`: `--veto`
+  MENANDAI (tak menghapus, veto ulang menimpa), promosi manual matang→`hard` + `--dry-run`.
+  (3) `GET /authoring/audit` membawa `pending_edges` + `ready_to_promote` (READ-only
+  struktural — `pending_edges.py` tak punya fungsi tulis); meja audit `/authoring`
+  merender antrian + hitung mundur + perintah tempel veto/promosi. (4) penulis edge
+  BERSAMA `services/edge_writer.py` (`append_edge` live + `write_pending`/`append_pending_edge`)
+  dipakai backend & script — satu serializer, tak menyimpang. (5) `_promote_node_genesis`
+  bercabang: `soft`→`edges.yaml` seperti sebelumnya; `hard`→`edges.pending.yaml`, rollback
+  dua-berkas (unlink bila pending tadinya absen). (6) pintu HTTP `TriggerNodeIn.edge_type`.
+
+  **KLAMP A1 — pengaman inti.** `jobs.trigger_r4_node` memaksa `edge_type="soft"` selama
+  `config.AMENDMENT_B_ENABLED` (env `REPRO_AMENDMENT_B`) off, DIPERIKSA di titik kelahiran
+  `job.request` — jadi `hard` tak pernah tersimpan tak peduli pemanggilnya (router/test/
+  offline). Pintu HTTP boleh menerima `edge_type:"hard"`, klamp tetap menahannya. Dua test
+  pengaman §1 mengunci ini: (a) flag OFF + POST `/authoring/node` `hard` → job `soft`;
+  (b) flag ON → request `hard` tersimpan (satu-satunya yang berubah), dan promosi request
+  `hard` → mendarat di `edges.pending.yaml` tanpa menyentuh `edges.yaml`
+  (`test_hard_mendarat_di_pending_nol_sentuhan_edges`). Keduanya = "jalur `hard`
+  end-to-end hanya hidup dengan flag".
+
+  **Status aktivasi: B TETAP INAKTIF.** `REPRO_AMENDMENT_B` default False dan belum
+  dinyalakan di mana pun. Konsekuensinya: `_append_soft_edge` tetap SATU-SATUNYA jalur
+  penulisan edge dari AI, dan tetap selalu `soft` — persis seperti sebelum sesi ini.
+  Menyalakan B = satu tindakan sadar (`REPRO_AMENDMENT_B=1`), satu titik. Sampai itu,
+  seluruh lajur pending hidup penuh & teruji tapi tak pernah terisi dari AI → tak ada
+  yang bisa dipromosikan → nol kebocoran `hard`.
+
+  **Dua penyimpangan kecil dari rencana, tercatat:** (a) penulis pending ditaruh di
+  `edge_writer.py`, BUKAN `pending_edges.py` — yang terakhir sengaja dijaga READ-only
+  supaya jalur baca `GET /authoring/audit` tak bisa menyentuh disk (Langkah 3); serializer
+  Step 2 di script ikut di-refactor mengimpornya (satu penulis), test Step 2 tetap hijau.
+  (b) test pengaman OFF memanggil handler `router.trigger_node` LANGSUNG + `BackgroundTasks()`
+  yang hanya mengantre (bukan TestClient) — TestClient memakai `app.db`/`data/` sungguhan &
+  menjalankan CLI; pola direct-call ini konsisten dengan test authoring lain di repo.
+
+  **Utang yang tersisa (tak menghalangi B):** halaman audit sudah merender pending, tapi
+  aksi retire/set-destination masih kontrol pending — belum punya endpoint (§7 2026-08-31).
+
+  *Ditolak:* (i) mengaktifkan `REPRO_AMENDMENT_B` sekaligus saat mendaratkan kode
+  (memisahkan pemasangan pintu dari penyalaan menjaga titik pembalikan termurah terbuka —
+  kode B bisa di-review tenang sebelum satu `hard` pun mengalir); (ii) menaruh penulis
+  pending di `pending_edges.py` (melemahkan jaminan READ-only yang ditegakkan Langkah 3);
+  (iii) test pengaman lewat TestClient (rapuh terhadap DB/CLI nyata, dan menjalankan
+  background task yang tak diinginkan di jalur test).

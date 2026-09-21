@@ -245,9 +245,12 @@ mengunci Bryant. Isyah tetap **satu-satunya** yang bisa veto.
 3. **Script promosi dijalankan MANUAL oleh Isyah.** Bukan cron OS, bukan `/schedule`
    harness, bukan timer in-app (lihat §5). Meja audit hanya mengingatkan "X siap promosi".
 
-**Masih terbuka (dirinci di execution-plan, bukan di sini):**
+**Sudah diimplementasi (2026-09-21, execution-plan Langkah 4 / Bagian A):**
 
-- **Percabangan `_promote_node_genesis`.** Saat Amandemen B aktif, jalur `prereq_node_id`
-  harus bercabang: usul `hard` → tulis ke `edges.pending.yaml` (bukan `_append_soft_edge`
-  ke `edges.yaml`); usul `soft` → tetap seperti sekarang. Detail cabang ini milik
-  execution-plan.
+- **Percabangan `_promote_node_genesis` — SELESAI.** Jalur `prereq_node_id` bercabang atas
+  `job.request["edge_type"]`: usul `hard` → `edge_writer.append_pending_edge` ke
+  `edges.pending.yaml` (rollback dua-berkas: unlink bila pending tadinya absen); usul `soft`
+  → `_append_soft_edge` ke `edges.yaml` seperti sebelumnya. `edge_type` di-klamp ke `soft`
+  di `jobs.trigger_r4_node` selama `REPRO_AMENDMENT_B` off, jadi cabang `hard` teruji
+  (`test_promote_node.py`) tapi mati untuk pengguna sampai flag dinyalakan sadar.
+  Detail & test: `execution-plan-async-review.md` §5 + CLAUDE.md §7 2026-09-21.

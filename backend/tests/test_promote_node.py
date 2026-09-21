@@ -186,3 +186,62 @@ def test_probe_ditulis_sebagai_string_bukan_enum(data_tmp, session, job_at):
     probe = yaml.safe_load(raw)
     assert probe["type"] == PROBE["type"]
     assert "!!python" not in raw
+
+
+# --------------------------------------------------------------------------- #
+# Langkah 4 (Bagian A) — cabang edge_type soft/hard. Default soft tak berubah;
+# hard mendarat di `edges.pending.yaml`, NOL sentuhan `edges.yaml`.
+# --------------------------------------------------------------------------- #
+def _pending_path(data):
+    return data / "domains" / "fastapi" / "edges.pending.yaml"
+
+
+def test_default_soft_tak_membuat_pending(data_tmp, session, job_at):
+    """Job tanpa `edge_type` → perilaku default soft; berkas pending TAK dibuat."""
+    _write(job_at.dir, _genesis_files())
+    review_queue._promote_node_genesis(session, job_at)
+    assert not _pending_path(data_tmp).exists()
+
+
+def test_hard_mendarat_di_pending_nol_sentuhan_edges(data_tmp, session, job_at):
+    """`edge_type="hard"` → satu entri di `edges.pending.yaml`; `edges.yaml` byte-identik."""
+    from app.services.pending_edges import load_pending
+
+    edges_path = data_tmp / "domains" / "fastapi" / "edges.yaml"
+    edges_sebelum = edges_path.read_text("utf-8")
+    job_at.request["edge_type"] = "hard"
+    _write(job_at.dir, _genesis_files())
+    promotion = review_queue._promote_node_genesis(session, job_at)
+
+    # edges.yaml TAK tersentuh (loop tetap buta → node baru selalu `available`).
+    assert edges_path.read_text("utf-8") == edges_sebelum
+
+    entries = load_pending(_pending_path(data_tmp))
+    assert len(entries) == 1
+    e = entries[0]
+    assert e.from_ == PREREQ and e.to == "n014_get_route"
+    assert e.type.value == "hard"
+    assert e.job_id == job_at.id
+    assert e.queued_at is not None
+    assert promotion.db_effect["edge_type"] == "hard"
+    assert promotion.db_effect["pending_edge_from"] == PREREQ
+    assert promotion.db_effect["soft_edge_from"] == ""
+
+
+def test_rollback_hard_pending_kembali_absen(data_tmp, session, job_at, monkeypatch):
+    """Rollback cabang hard: folder node hilang DAN `edges.pending.yaml` kembali absen
+    (unlink, karena tadinya belum ada) — tak meninggalkan berkas pending yatim."""
+    pending_path = _pending_path(data_tmp)
+    assert not pending_path.exists()  # baseline: belum ada pending
+    job_at.request["edge_type"] = "hard"
+    _write(job_at.dir, _genesis_files())
+
+    def _meledak(_):
+        raise NodeValidationError("butuh >= 2 varian instance")
+
+    monkeypatch.setattr(review_queue, "assemble_node", _meledak)
+    with pytest.raises(review_queue.PromotionError, match="promosi dibatalkan"):
+        review_queue._promote_node_genesis(session, job_at)
+
+    assert not _node_dir(data_tmp).exists()
+    assert not pending_path.exists()  # unlink, bukan berkas kosong yatim

@@ -19,6 +19,7 @@ Bentuk promosi per peran:
 
 import shutil
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -27,8 +28,10 @@ from sqlmodel import Session, select
 from app.claude import contracts
 from app.claude.artifacts import REVIEWABLE, Job, JobStatus, Role, read_job, set_status
 from app.config import DATA_DIR
-from app.models import HypothesisSource, HypothesisStatus, Node, SkillHypothesis
-from app.services.node_loader import assemble_node, load_domain_into_db, load_edges
+from app.models import EdgeType, HypothesisSource, HypothesisStatus, Node, SkillHypothesis
+from app.services.edge_writer import append_edge, append_pending_edge
+from app.services.node_loader import assemble_node, load_domain_into_db
+from app.services.pending_edges import PendingEdge
 
 #: Berkas varian yang ditulis saat promosi. Ekstensi kode diambil dari artifact
 #: (`.py` FastAPI/ML, `.jsx` React), bukan diasumsikan — versi M5 meng-hardcode `.py`
@@ -212,20 +215,30 @@ def _promote_node_genesis(session: Session, job: Job) -> Promotion:
     Node setengah jadi bukan cuma jelek: `assemble_node` menolak node dengan < 2 varian,
     dan `load_nodes.py` memuat per-DOMAIN — jadi satu folder cacat mematikan seluruh
     domain, bukan cuma dirinya. Karena itu rollback di sini menghapus folder node DAN
-    mengembalikan `edges.yaml` ke isi persisnya semula.
+    mengembalikan `edges.yaml`/`edges.pending.yaml` ke isi persisnya semula.
+
+    Edge bercabang berdasarkan `job.request["edge_type"]` (di-klamp ke `soft` di
+    `jobs.trigger_r4_node` selama Amandemen B off): `soft` → `edges.yaml` langsung;
+    `hard` → antrian `edges.pending.yaml` (menunggu veto 7 hari, §7 2026-09-16).
     """
     artifact = contracts.load_node_genesis(job.dir, job.request)
     node_id = artifact.node.id
     domain_dir = DATA_DIR / "domains" / artifact.node.domain_id
     target = domain_dir / "nodes" / node_id
     edges_path = domain_dir / "edges.yaml"
+    pending_path = domain_dir / "edges.pending.yaml"
 
     if target.exists():
         raise PromotionError(f"folder node {node_id!r} sudah ada — ganti slug atau hapus dulu")
     if session.get(Node, node_id):
         raise PromotionError(f"node {node_id!r} sudah terdaftar di DB")
 
+    # Backup KEDUA berkas edge: hanya satu yang tersentuh per cabang, tapi merestorasi
+    # keduanya seragam membuat rollback benar tanpa peduli cabang. `None` = berkas belum
+    # ada (hard-edge pertama di domain) → rollback meng-unlink, bukan menulis balik.
     edges_backup = edges_path.read_text(encoding="utf-8") if edges_path.exists() else None
+    pending_backup = pending_path.read_text(encoding="utf-8") if pending_path.exists() else None
+    edge_type = job.request.get("edge_type", "soft")
     written: list[str] = []
     try:
         (target / "probes").mkdir(parents=True)
@@ -254,22 +267,40 @@ def _promote_node_genesis(session: Session, job: Job) -> Promotion:
 
         prereq = job.request.get("prereq_node_id") or ""
         if prereq:
-            _append_soft_edge(
-                edges_path,
-                from_id=prereq,
-                to_id=node_id,
-                source_ref_id=job.request["source_ref_id"],
-                library_file=job.request["library_file"],
-            )
-            written.append(_rel(edges_path))
+            if edge_type == "hard":
+                # Usul `hard` TAK langsung mengunci: masuk antrian veto 7 hari. `edges.yaml`
+                # tak tersentuh → loop tetap buta → node baru selalu `available`.
+                append_pending_edge(
+                    pending_path,
+                    PendingEdge(
+                        from_=prereq,
+                        to=node_id,
+                        type=EdgeType.hard,
+                        source_ref_id=job.request["source_ref_id"],
+                        library_file=job.request["library_file"],
+                        job_id=job.id,
+                        queued_at=datetime.now(UTC),
+                        note="Usul L4 (AI) — menunggu veto Isyah s/d queued_at + 7 hari.",
+                    ),
+                )
+                written.append(_rel(pending_path))
+            else:
+                _append_soft_edge(
+                    edges_path,
+                    from_id=prereq,
+                    to_id=node_id,
+                    source_ref_id=job.request["source_ref_id"],
+                    library_file=job.request["library_file"],
+                )
+                written.append(_rel(edges_path))
 
         # Validasi M2 berlaku PENUH untuk output AI (sama seperti _promote_r4).
         assemble_node(target)
         load_domain_into_db(session, domain_dir, data_dir=DATA_DIR)
     except Exception as e:  # noqa: BLE001 — rollback file, lalu laporkan apa adanya
         shutil.rmtree(target, ignore_errors=True)
-        if edges_backup is not None:
-            edges_path.write_text(edges_backup, encoding="utf-8")
+        _restore_or_unlink(edges_path, edges_backup)
+        _restore_or_unlink(pending_path, pending_backup)
         raise PromotionError(f"promosi dibatalkan, node akan menjadi tak sah: {e}") from e
 
     return Promotion(
@@ -280,10 +311,22 @@ def _promote_node_genesis(session: Session, job: Job) -> Promotion:
         db_effect={
             "variants": [v.variant_label for v in artifact.variants],
             "probe_id": artifact.probe.id,
-            "soft_edge_from": job.request.get("prereq_node_id", ""),
+            "edge_type": edge_type,
+            "soft_edge_from": prereq if edge_type == "soft" else "",
+            "pending_edge_from": prereq if edge_type == "hard" else "",
             "library_file": job.request["library_file"],
         },
     )
+
+
+def _restore_or_unlink(path: Path, backup: str | None) -> None:
+    """Kembalikan `path` ke keadaan pra-promosi: tulis balik isinya, atau hapus bila
+    berkasnya memang belum ada sebelum promosi (mis. `edges.pending.yaml` untuk hard-edge
+    pertama di domain). Tanpa ini, rollback meninggalkan berkas pending yatim."""
+    if backup is None:
+        path.unlink(missing_ok=True)
+    else:
+        path.write_text(backup, encoding="utf-8")
 
 
 def _dump_yaml(path: Path, data: dict) -> None:
@@ -304,29 +347,23 @@ def _dump_yaml(path: Path, data: dict) -> None:
 def _append_soft_edge(
     edges_path: Path, *, from_id: str, to_id: str, source_ref_id: str, library_file: str
 ) -> None:
-    """Tambah SATU edge `soft` lewat APPEND TEKS, lalu buktikan berkasnya masih parse.
-
-    Ditulis sebagai teks, bukan `yaml.dump` ulang: `edges.yaml` penuh komentar kurasi
-    ("difinalkan Isyah 2026-08-22 …") dan dumper akan menghapusnya diam-diam.
+    """Tambah SATU edge `soft` ke `edges.yaml`. Pembungkus tipis di atas
+    `app.services.edge_writer.append_edge` — modul BERSAMA dengan `scripts/
+    promote_pending_edges.py` (yang menulis `hard` matang), supaya dua penulis edge tak
+    diam-diam menyimpang (Amandemen C / Langkah 2).
 
     Selalu `soft` (§7 2026-09-01): edge `hard` yang salah mengunci Bryant KELUAR dari
     node yang sebenarnya siap ia kerjakan; edge `soft` yang salah cuma saran keliru.
     """
-    blok = (
-        f"\n  # Usul L4 (AI) dari peta Library: {library_file}\n"
-        f"  - from: {from_id}\n"
-        f"    to: {to_id}\n"
-        f"    type: soft\n"
-        f"    source_ref_id: {source_ref_id}\n"
-        f'    note: "Usulan L4 — menyarankan urutan, tidak mengunci."\n'
+    append_edge(
+        edges_path,
+        from_id=from_id,
+        to_id=to_id,
+        edge_type="soft",
+        source_ref_id=source_ref_id,
+        comment=f"Usul L4 (AI) dari peta Library: {library_file}",
+        note="Usulan L4 — menyarankan urutan, tidak mengunci.",
     )
-    if edges_path.exists():
-        edges_path.write_text(
-            edges_path.read_text(encoding="utf-8").rstrip("\n") + "\n" + blok, encoding="utf-8"
-        )
-    else:
-        edges_path.write_text("edges:\n" + blok, encoding="utf-8")
-    load_edges(edges_path)  # gagal parse → exception → rollback di pemanggil
 
 
 def _promote_r2(session: Session, job: Job) -> Promotion:

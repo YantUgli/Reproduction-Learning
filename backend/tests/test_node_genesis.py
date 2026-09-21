@@ -199,7 +199,11 @@ def test_trigger_membentuk_job_dengan_identitas_terkunci(
     )
     assert job.role == Role.r4_challenge.value
     assert job.request["mode"] == "node"
-    assert job.request["node_id"].startswith("n014_")
+    # Id diturunkan dari node terakhir domain, jangan hardcode angkanya — itu pecah tiap
+    # node baru ditambah ke `data/` (§7 2026-08-22 A2: jaga BENTUK, bukan angka literal).
+    # Yang dijaga: node_id PERSIS kontrak `_next_node_id` (identitas ditentukan mesin).
+    expected = jobs._next_node_id(jobs._domain_nodes(session, "fastapi"), "get-route")
+    assert job.request["node_id"] == expected
     assert job.request["variant_labels"] == ["variant_a", "variant_b"]
     assert job.request["probe_id"] == job.request["node_id"][:4] + "_probe_01"
     assert job.request["grader_type"] == "unit_test"
@@ -207,6 +211,77 @@ def test_trigger_membentuk_job_dengan_identitas_terkunci(
     assert job.request["library_file"] == materi
     # Identitas ikut ke prompt supaya model tahu ia tak boleh menamai sendiri.
     assert job.request["node_id"] in (job.dir / "prompt.md").read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- #
+# PENGAMAN §1 (Bagian B) — pintu HTTP `edge_type` ADA, tapi klamp A1 menahan `hard`
+# selama Amandemen B off. `hard` end-to-end hanya hidup dengan flag menyala.
+# --------------------------------------------------------------------------- #
+def test_pintu_http_hard_diklamp_soft_saat_flag_off(
+    session, materi, contoh_terjangkau, monkeypatch
+):
+    """Flag OFF (default) + POST /authoring/node body `edge_type="hard"` → job `soft`.
+
+    Memanggil handler router LANGSUNG (bukan TestClient): TestClient memakai `app.db` +
+    `data/` sungguhan & menjalankan background task CLI. `BackgroundTasks()` yang dilewatkan
+    di sini hanya MENGANTRE task, tak menjalankannya — jadi CLI tak pernah dipanggil.
+    """
+    from fastapi import BackgroundTasks
+
+    from app.routers import authoring
+
+    monkeypatch.setattr(jobs.grounding, "has_snapshot", lambda sid, **kw: True)
+    # flag TIDAK di-monkeypatch → default OFF.
+    body = authoring.TriggerNodeIn(
+        library_file=materi,
+        slug="get-route",
+        domain_id="fastapi",
+        concept="GET route JSON",
+        source_ref_id="fastapi_docs_first_steps",
+        prereq_node_id="n002_get_json_route",
+        edge_type="hard",
+    )
+    out = authoring.trigger_node(body, BackgroundTasks(), session)
+    # Pintu HTTP menerima "hard", tapi klamp A1 di trigger_r4_node memaksanya "soft".
+    assert out.request["edge_type"] == "soft"
+
+
+def test_flag_on_melepas_klamp_edge_type_hard(session, materi, contoh_terjangkau, monkeypatch):
+    """Flag ON → trigger menyimpan `edge_type="hard"` (klamp terangkat).
+
+    Ini SATU-SATUNYA yang berubah antara off & on. Sisi promosi — request `hard` →
+    mendarat di `edges.pending.yaml`, `edges.yaml` tak tersentuh — sudah dibuktikan di
+    `test_promote_node.py::test_hard_mendarat_di_pending_nol_sentuhan_edges`. Dua test itu
+    bersama = "jalur hard end-to-end hanya hidup dengan flag".
+    """
+    monkeypatch.setattr(jobs.grounding, "has_snapshot", lambda sid, **kw: True)
+
+    # Baseline: flag off → soft (kontras eksplisit di test yang sama).
+    off = jobs.trigger_r4_node(
+        session,
+        library_file=materi,
+        slug="get-route",
+        domain_id="fastapi",
+        concept="GET route JSON",
+        source_ref_id="fastapi_docs_first_steps",
+        prereq_node_id="n002_get_json_route",
+        edge_type="hard",
+    )
+    assert off.request["edge_type"] == "soft"
+
+    # Flag ON → klamp terangkat, "hard" tersimpan.
+    monkeypatch.setattr(jobs.config, "AMENDMENT_B_ENABLED", True)
+    on = jobs.trigger_r4_node(
+        session,
+        library_file=materi,
+        slug="get-route-two",
+        domain_id="fastapi",
+        concept="GET route JSON",
+        source_ref_id="fastapi_docs_first_steps",
+        prereq_node_id="n002_get_json_route",
+        edge_type="hard",
+    )
+    assert on.request["edge_type"] == "hard"
 
 
 # --------------------------------------------------------------------------- #

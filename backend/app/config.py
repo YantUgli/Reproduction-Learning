@@ -109,6 +109,12 @@ CLAUDE_INTEGRATION_ENABLED = _env_flag("CLAUDE_INTEGRATION_ENABLED", True)
 # berhenti di `ready` dan menunggu klik manusia di `/authoring`.
 CLAUDE_AUTO_PROMOTE = _env_flag("CLAUDE_AUTO_PROMOTE", True)
 
+# Amandemen B (§7 2026-09-16): AI boleh MENGUSULKAN edge `hard` (masuk antrian veto 7
+# hari, bukan langsung mengunci). Default MATI: `trigger_r4_node` memaksa `soft` selama
+# flag ini off — apa pun isi request — jadi tak ada `hard` yang bisa mengalir sampai
+# seluruh lajur pending (store + script + audit) terbukti dan flag ini dinyalakan sadar.
+AMENDMENT_B_ENABLED = _env_flag("REPRO_AMENDMENT_B", False)
+
 # Binary Claude Code headless. Tak ada di PATH → job `failed` dengan pesan jelas,
 # bukan exception yang merembet ke request UI.
 CLAUDE_CLI_PATH = os.environ.get("CLAUDE_CLI_PATH", "claude")

@@ -270,10 +270,28 @@ export interface AuditCoverage {
   lapsed_now: number;
 }
 
+// Usulan edge `hard` menunggu veto Isyah (Amandemen C / lajur ASYNC). Hidup di
+// `edges.pending.yaml`, TAK PERNAH di `edges.yaml` — loop buta terhadapnya, node tetap
+// `available` selama menunggu. Promosi lewat script manual, bukan lewat UI ini.
+export interface PendingEdgeOut {
+  from_node_id: string;
+  to_node_id: string;
+  domain_id: string;
+  library_file: string;
+  job_id: string;
+  source_ref_id: string;
+  state: "menunggu" | "matang" | "diveto";
+  queued_at: string;
+  matures_at: string;
+  veto_reason: string;
+}
+
 export interface AuditOut {
   coverage: AuditCoverage;
   node_signals: AuditSignal[];
   edge_findings: AuditEdge[];
+  pending_edges: PendingEdgeOut[];
+  ready_to_promote: number;
   domains_without_destination: string[];
 }
 
